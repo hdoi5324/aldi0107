@@ -20,27 +20,29 @@ def generate_mosaics(labelled_multiimg_aug_data, shortest_side=1024):
         # Get four images and corresponding boxes
         dataset_dicts = mo_items[i*4:i*4+4]
         boxes = []
-        imgs = []
+        imgs, weak_imgs = [], []
         classes = []
         for ds in dataset_dicts:
             imgs.append(ds["image"])
+            weak_imgs.append(ds["img_weak"])
             boxes.append(ds["instances"].get("gt_boxes"))
             classes.append(ds["instances"].get("gt_classes"))
         mt = MosaicTransform(imgs, boxes)
+        mt_weak = MosaicTransform(weak_imgs, None)
         image = mt.apply_image()
+        weak_img = mt_weak.apply_image()
         scale = shortest_side / image.shape[1] # Replace with maximum MIN_SIZE
         image = torchvision.transforms.Resize(shortest_side).forward(image)
+        weak_img = torchvision.transforms.Resize(shortest_side).forward(weak_img)
         boxes = mt.apply_box()
         boxes.scale(scale, scale)
         key_ds = dataset_dicts[0]
         key_ds["image"] = image
+        key_ds["img_weak"] = weak_img
         key_ds["height"] = image.shape[1]
         key_ds["width"] = image.shape[2]
         key_ds["instances"].set("gt_boxes", boxes)
         key_ds["instances"].set("gt_classes", torch.cat(classes))
-        
-        # Scale image and boxes down
-        scale = key_ds
         mosaic_data.append(key_ds)
     return mosaic_data
 

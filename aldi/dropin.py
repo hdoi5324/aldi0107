@@ -53,7 +53,7 @@ class DefaultTrainer(_DefaultTrainer):
             data_loader = self.build_train_loader(cfg)
 
             ### Change is here ###
-            model = self.create_ddp_model(model, broadcast_buffers=False, cfg=cfg, find_unused_parameters=True)
+            model = self.create_ddp_model(model, broadcast_buffers=False, cfg=cfg, find_unused_parameters=cfg.MODEL.FIND_UNUSED_PARAMETERS)
             ###   End change   ###
 
             ## Change is here ##
@@ -142,7 +142,7 @@ class AMPTrainer(_AMPTrainer):
         """
         assert self.model.training, "[AMPTrainer] model was changed to eval mode!"
         assert torch.cuda.is_available(), "[AMPTrainer] CUDA is required for AMP training!"
-        from torch.cuda.amp import autocast
+        from torch.amp import autocast
 
         start = time.perf_counter()
         data = next(self._data_loader_iter)
@@ -150,17 +150,25 @@ class AMPTrainer(_AMPTrainer):
 
         if self.zero_grad_before_forward:
             self.optimizer.zero_grad()
-        with autocast(dtype=self.precision):
+        with autocast("cuda", dtype=self.precision):
             
             ## Change is here ##
-            if len(data) == 5: # Multi Image Aug data provided
+            if len(data) == 5: # Multi Image Aug data provided in 5th position
                 # Add mosaics into strong_labelled data at position 1 in data.
                 data = list(data)
-                mosaic_data = generate_mosaics(data[-1])
-                n_labeled_strong = len(data[1])
-                labeled_strong = data[1] + mosaic_data
-                labeled_strong = random.sample(labeled_strong, n_labeled_strong)
-                data[1] = labeled_strong
+                multiimgaug_data = data[-1]
+                n_labeled = len(multiimgaug_data)//4
+                new_labeled_strong = []
+                new_labeled_weak = [] if data[0] is not None else None
+                labeled_strong = data[1]
+                mosaic_prob = 0.2
+                for i in range(n_labeled):
+                    data_dict = labeled_strong[i*4] if np.random.rand() > mosaic_prob else generate_mosaics(multiimgaug_data[i*4:i*4+4])[0]
+                    new_labeled_strong.append(data_dict)
+                    if new_labeled_weak is not None:
+                        new_labeled_weak.append(copy.deepcopy(data_dict))
+                data[0] = new_labeled_weak
+                data[1] = new_labeled_strong
                 data = data[:-1]
             loss_dict = self.run_model(data)
             ##   End change   ##

@@ -84,6 +84,9 @@ def add_aldi_config(cfg):
     # Unbiased Mean Teacher style feature alignment
     _C.MODEL.UMT = CN()
     _C.MODEL.UMT.ENABLED = False
+    
+    # Fix issue with unused paratemetsr
+    _C.MODEL.FIND_UNUSED_PARAMETERS = False
 
     # We use gradient accumulation to run the weak/strong/unlabeled data separately
     # Should we call backward intermittently during accumulation or at the end?
