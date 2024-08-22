@@ -11,6 +11,8 @@ import time
 import torch
 import copy
 import numpy as np
+import random
+
 
 from detectron2.checkpoint import DetectionCheckpointer
 from detectron2.data.dataset_mapper import DatasetMapper as _DatasetMapper
@@ -24,6 +26,7 @@ from detectron2.engine.defaults import DefaultTrainer as _DefaultTrainer
 from detectron2.utils.logger import setup_logger
 from detectron2.utils import comm
 from detectron2.utils.events import get_event_storage
+from aldi.advanced_aug import generate_mosaics
 
 
 class DefaultTrainer(_DefaultTrainer):
@@ -150,6 +153,15 @@ class AMPTrainer(_AMPTrainer):
         with autocast(dtype=self.precision):
             
             ## Change is here ##
+            if len(data) == 5: # Multi Image Aug data provided
+                # Add mosaics into strong_labelled data at position 1 in data.
+                data = list(data)
+                mosaic_data = generate_mosaics(data[-1])
+                n_labeled_strong = len(data[1])
+                labeled_strong = data[1] + mosaic_data
+                labeled_strong = random.sample(labeled_strong, n_labeled_strong)
+                data[1] = labeled_strong
+                data = data[:-1]
             loss_dict = self.run_model(data)
             ##   End change   ##
 
@@ -220,6 +232,6 @@ class DatasetMapper(_DatasetMapper):
         ##   End change   ##
 
         return dataset_dict
-    
+
     def _after_call(self, dataset_dict, aug_input):
         return dataset_dict

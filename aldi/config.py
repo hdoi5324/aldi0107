@@ -21,6 +21,7 @@ def add_aldi_config(cfg):
     _C.AUG.UNLABELED_MIC_AUG = False
     _C.AUG.MIC_RATIO = 0.5
     _C.AUG.MIC_BLOCK_SIZE = 32
+    _C.AUG.MOSAIC = False
 
     # EMA of student weights
     _C.EMA = CN()

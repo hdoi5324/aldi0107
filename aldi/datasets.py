@@ -32,6 +32,10 @@ register_coco_instances("nudi_urchin3_test", {}, "datasets/collated_outputs/nudi
 register_coco_instances("urchininf_v0_train", {}, "datasets/collated_outputs/urchininf_v0/annotations/instances_train2023.json", "datasets/collated_outputs/urchininf_v0/train2023")
 register_coco_instances("urchininf_v0_test", {}, "datasets/collated_outputs/urchininf_v0/annotations/instances_test2023.json", "datasets/collated_outputs/urchininf_v0/test2023")
 
+# Urchin synthetic urchininf_rov_v1
+register_coco_instances("urchininf_rov_v1_train", {}, "datasets/collated_outputs/urchininf_rov_v1/annotations/instances_train2023.json", "datasets/collated_outputs/urchininf_rov_v1/train2023")
+register_coco_instances("urchininf_rov_v1_test", {}, "datasets/collated_outputs/urchininf_rov_v1/annotations/instances_test2023.json", "datasets/collated_outputs/urchininf_rov_v1/test2023")
+
 
 # UDD
 register_coco_instances("UDD_test", {}, "datasets/UDD/annotations/instances_test2023_remap.json", "datasets/UDD/test2023")
@@ -41,5 +45,8 @@ register_coco_instances("UDD_train", {}, "datasets/UDD/annotations/instances_tra
 register_coco_instances("squidle_urchin_2011_test", {}, "datasets/squidle_coco/squidle_urchin_2011/annotations/instances_test2023.json", "datasets/squidle_coco/squidle_urchin_2011/test2023")
 register_coco_instances("squidle_urchin_2009_train", {}, "datasets/squidle_coco/squidle_urchin_2009/annotations/instances_train2023.json", "datasets/squidle_coco/squidle_urchin_2009/train2023")
 
-# S-UODAC2020 https://github.com/mousecpn/DMC-Domain-Generalization-for-Underwater-Object-Detection
-register_coco_instances("SUODAC2020_test", {}, "datasets/S-UODAC2020/COCO_Annotations/instances_urchin_target.json", "datasets/S-UODAC2020/type7")
+# S-UODAC2020
+register_coco_instances("SUODAC2020_test", {}, "datasets/S-UODAC2020/COCO_Annotations/instances_target.json", "datasets/S-UODAC2020/test")
+register_coco_instances("SUODAC2020_train", {}, "datasets/S-UODAC2020/COCO_Annotations/instances_source.json", "datasets/S-UODAC2020/train")
+
+

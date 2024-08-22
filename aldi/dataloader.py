@@ -67,6 +67,8 @@ def unpack_data_weak_strong(labeled, unlabeled, batch_contents=("labeled_weak", 
                 img["image"] = img[WEAK_IMG_KEY]
     labeled_strong = labeled if "labeled_strong" in batch_contents else None
 
+    labeled_multiimgaug = copy.deepcopy(labeled) if "labeled_multiimgaug" in batch_contents else None
+
     # unlike labeled data, we always return unlabeled_weak if *any* unlabeled data is requested
     # this allows us to do pseudo-labeling using the weakly augmented target data
     unlabeled_weak = None
@@ -77,4 +79,7 @@ def unpack_data_weak_strong(labeled, unlabeled, batch_contents=("labeled_weak", 
                 img["image"] = img[WEAK_IMG_KEY]
     unlabeled_strong = unlabeled if "unlabeled_strong" in batch_contents else None
 
-    return labeled_weak, labeled_strong, unlabeled_weak, unlabeled_strong
+    if "labeled_multiimgaug" in batch_contents:
+        return labeled_weak, labeled_strong, unlabeled_weak, unlabeled_strong, labeled_multiimgaug
+    else:
+        return labeled_weak, labeled_strong, unlabeled_weak, unlabeled_strong

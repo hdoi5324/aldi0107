@@ -3,7 +3,7 @@ MODEL:
   ROI_HEADS:
     NUM_CLASSES: 1
 DATASETS:
-  TRAIN: ("urchininf_v0_train",)
+  TRAIN: ("urchininf_v0_train","urchininf_rov_v1_train")
   TEST: ("UDD_test",)
   BATCH_CONTENTS: ("labeled_weak", )
 EMA:

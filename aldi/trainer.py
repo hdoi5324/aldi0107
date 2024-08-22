@@ -219,7 +219,8 @@ class ALDITrainer(DefaultTrainer):
           assert sum(batch_sizes) == total_batch_size, f"sum(batch_sizes)={sum(batch_sizes)} must equal total_batch_size={total_batch_size}"
 
           labeled_bs = [batch_sizes[i] for i in range(len(batch_contents)) if batch_contents[i].startswith("labeled")]
-          labeled_bs = max(labeled_bs) if len(labeled_bs) else 0
+          mosaic_bs = [batch_sizes[i]*4 for i in range(len(batch_contents)) if batch_contents[i] == "labeled_multiimgaug"]
+          labeled_bs = max(labeled_bs + mosaic_bs) if len(labeled_bs) else 0
           unlabeled_bs = [batch_sizes[i] for i in range(len(batch_contents)) if batch_contents[i].startswith("unlabeled")]
           unlabeled_bs = max(unlabeled_bs) if len(unlabeled_bs) else 0
 
