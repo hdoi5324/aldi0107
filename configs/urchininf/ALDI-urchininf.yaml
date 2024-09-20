@@ -1,6 +1,6 @@
 _BASE_: "./Base-RCNN-FPN-urchininf_strongaug_ema.yaml"
 MODEL:
-  WEIGHTS: "outputs/urchininf/urchininf_base_strongaug_ema/model_final.pth" 
+  WEIGHTS: "outputs/urchininf/base_strongaug_ema_inf_udd/model_final.pth" 
 EMA:
   ENABLED: True
 DATASETS:

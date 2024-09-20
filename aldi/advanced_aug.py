@@ -1,16 +1,17 @@
 import copy
-
+import random
 import torchvision
 from detectron2.data import detection_utils as utils
 import torch
 import detectron2.data.transforms as T
 import numpy as np
 from detectron2.data import DatasetCatalog
-from detectron2.structures import BoxMode
+from detectron2.structures.instances import Instances
+from detectron2.structures.boxes import Boxes
 
 """Adapted from https://github.com/PacktPublishing/Hands-On-Computer-Vision-with-Detectron2/blob/main/Chapter09/Detectron2_Chapter09_CustomAugmentations.ipynb"""
 
-def generate_mosaics(labelled_multiimg_aug_data, shortest_side=1024):
+def generate_mosaics(labelled_multiimg_aug_data):
     # get three more random images
     mo_items = labelled_multiimg_aug_data
     # images
@@ -31,18 +32,31 @@ def generate_mosaics(labelled_multiimg_aug_data, shortest_side=1024):
         mt_weak = MosaicTransform(weak_imgs, None)
         image = mt.apply_image()
         weak_img = mt_weak.apply_image()
-        scale = shortest_side / image.shape[1] # Replace with maximum MIN_SIZE
-        image = torchvision.transforms.Resize(shortest_side).forward(image)
-        weak_img = torchvision.transforms.Resize(shortest_side).forward(weak_img)
+        orig_h, orig_w = mt.loc_info[0], mt.loc_info[1]
+        new_h, new_w = orig_h//2, orig_w//2
+
         boxes = mt.apply_box()
-        boxes.scale(scale, scale)
+        crop_y, crop_x = random.randint(0, orig_h-new_h), random.randint(0, orig_w-new_w)
+        boxes.tensor -= torch.tensor([new_h, new_w, new_h, new_w])
+        boxes.clip((new_h, new_w))
+        mask = torch.nonzero(boxes.area() > 0)
+        image = image[:,crop_y:crop_y+new_h,crop_x:crop_x+new_w]
+        weak_img = weak_img[:,crop_y:crop_y+new_h,crop_x:crop_x+new_w]
         key_ds = dataset_dicts[0]
         key_ds["image"] = image
         key_ds["img_weak"] = weak_img
         key_ds["height"] = image.shape[1]
         key_ds["width"] = image.shape[2]
-        key_ds["instances"].set("gt_boxes", boxes)
-        key_ds["instances"].set("gt_classes", torch.cat(classes))
+        if len(mask) == 0:
+            key_ds["instances"] = Instances(tuple(image.shape[1:]),
+                                            gt_boxes=Boxes(np.zeros((0, 4))),
+                                            gt_classes=torch.tensor([], dtype=torch.int64))
+            #print("No ground truth in mosaic")
+        else:
+            mask = mask.reshape((len(mask),))
+            boxes = boxes[mask]
+            classes = torch.cat(classes)[mask]
+            key_ds["instances"] = Instances(tuple(image.shape[1:]), gt_boxes=boxes, gt_classes=classes)
         mosaic_data.append(key_ds)
     return mosaic_data
 
@@ -92,7 +106,7 @@ class MosaicTransform(T.Transform):
 
     def apply_box(self):
         # combine boxes
-        boxes = self.mo_boxes
+        boxes = copy.deepcopy(self.mo_boxes)
         new_boxes = []
         # now update location values
         _, _, _, _, _, _, x_pads, y_pads = self.loc_info

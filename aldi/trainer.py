@@ -24,7 +24,7 @@ from aldi.model import build_aldi
 
 DEBUG = False
 debug_dict = {}
-
+logger = logging.getLogger(__name__)
 
 def run_model_labeled_unlabeled(trainer, labeled_weak, labeled_strong, unlabeled_weak, unlabeled_strong):
      """
@@ -121,11 +121,12 @@ def run_model_labeled_unlabeled(trainer, labeled_weak, labeled_strong, unlabeled
 # Extend both Detectron2's AMPTrainer and SimpleTrainer classes with DA capabilities
 # Used by DATrainer below in the same way DefaultTrainer uses the original AMP and Simple Trainers
 class _ALDITrainer:
-     def __init__(self, model, data_loader, optimizer, distiller, backward_at_end=True, model_batch_size=None):
+     def __init__(self, model, data_loader, optimizer, distiller, backward_at_end=True, model_batch_size=None, batch_size=None):
           super().__init__(model, data_loader, optimizer, zero_grad_before_forward=not backward_at_end)
           self.distiller = distiller
           self.backward_at_end = backward_at_end
           self.model_batch_size = model_batch_size
+          self.batch_size = batch_size
 
      def run_model(self, data):
           return run_model_labeled_unlabeled(self, *data)
@@ -146,7 +147,8 @@ class ALDITrainer(DefaultTrainer):
           distiller = build_distiller(cfg=cfg, teacher=self.ema.model if cfg.EMA.ENABLED else model, student=model)
           trainer = (ALDIAMPTrainer if cfg.SOLVER.AMP.ENABLED else ALDISimpleTrainer)(model, data_loader, optimizer, distiller,
                                                                                   backward_at_end=cfg.SOLVER.BACKWARD_AT_END,
-                                                                                  model_batch_size=cfg.SOLVER.IMS_PER_GPU)
+                                                                                  model_batch_size=cfg.SOLVER.IMS_PER_GPU,
+                                                                                      batch_size=cfg.SOLVER.IMS_PER_BATCH)
           return trainer
      
      def _create_checkpointer(self, model, cfg):
@@ -159,9 +161,9 @@ class ALDITrainer(DefaultTrainer):
      @classmethod
      def build_model(cls, cfg):
           model = build_aldi(cfg)
-          logger = logging.getLogger(__name__)
+          logger = logging.getLogger("detectron2")
           logger.info("Model:\n{}".format(model))
-          print(model) # TODO: Not sure why logging not working
+          #print(model) # TODO: Not sure why logging not working
           return model
 
      @classmethod
@@ -220,22 +222,29 @@ class ALDITrainer(DefaultTrainer):
 
           labeled_bs = [batch_sizes[i] for i in range(len(batch_contents)) if batch_contents[i].startswith("labeled")]
           labeled_bs = max(labeled_bs) if len(labeled_bs) else 0
-          labeled_bs = labeled_bs * 4 if "labeled_multiimgaug" in batch_contents else labeled_bs
+          # Add 3 extra images for each mosaic aug - todo: make configurable size
+          labeled_bs = labeled_bs + int(labeled_bs * cfg.AUG.MOSAIC_P) * 3 if "labeled_multiimgaug" in batch_contents else labeled_bs
           unlabeled_bs = [batch_sizes[i] for i in range(len(batch_contents)) if batch_contents[i].startswith("unlabeled")]
           unlabeled_bs = max(unlabeled_bs) if len(unlabeled_bs) else 0
+          unlabeled_bs = unlabeled_bs + int(unlabeled_bs * cfg.AUG.MOSAIC_P) * 3 if "unlabeled_multiimgaug" in batch_contents else labeled_bs
 
           # create labeled dataloader
           labeled_loader = None
           if labeled_bs > 0 and len(cfg.DATASETS.TRAIN):
-               labeled_loader = build_detection_train_loader(get_detection_dataset_dicts(cfg.DATASETS.TRAIN, filter_empty=cfg.DATALOADER.FILTER_EMPTY_ANNOTATIONS), 
+               labeled_dataset = get_detection_dataset_dicts(cfg.DATASETS.TRAIN, filter_empty=cfg.DATALOADER.FILTER_EMPTY_ANNOTATIONS)
+               if len(labeled_dataset) > cfg.DATASETS.TRAIN_SIZE:
+                    labeled_dataset = labeled_dataset[:cfg.DATASETS.TRAIN_SIZE]
+                    logger = logging.getLogger("detectron2")
+                    logger.info("Reducing dataset size!!! : Dataset size is now {} with {} annotations".format(len(labeled_dataset), sum([len(img['annotations']) for img in labeled_dataset])))
+               labeled_loader = build_detection_train_loader(labeled_dataset, 
                     mapper=SaveWeakDatasetMapper(cfg, is_train=True, augmentations=get_augs(cfg, labeled=True, include_strong_augs="labeled_strong" in batch_contents)),
-                    num_workers=cfg.DATALOADER.NUM_WORKERS, 
+                    num_workers=cfg.DATALOADER.NUM_WORKERS,
                     total_batch_size=labeled_bs)
 
           # create unlabeled dataloader
           unlabeled_loader = None
           if unlabeled_bs > 0 and len(cfg.DATASETS.UNLABELED):
-               unlabeled_loader = build_detection_train_loader(get_detection_dataset_dicts(cfg.DATASETS.UNLABELED, filter_empty=cfg.DATALOADER.FILTER_EMPTY_ANNOTATIONS), 
+               unlabeled_loader = build_detection_train_loader(get_detection_dataset_dicts(cfg.DATASETS.UNLABELED, filter_empty=cfg.DATALOADER.FILTER_UNLABELED_EMPTY_ANNOTATIONS),
                     mapper=UnlabeledDatasetMapper(cfg, is_train=True, augmentations=get_augs(cfg, labeled=False, include_strong_augs="unlabeled_strong" in batch_contents)),
                     num_workers=cfg.DATALOADER.NUM_WORKERS,
                     total_batch_size=unlabeled_bs)

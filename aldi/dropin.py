@@ -153,23 +153,7 @@ class AMPTrainer(_AMPTrainer):
         with autocast("cuda", dtype=self.precision):
             
             ## Change is here ##
-            if len(data) == 5: # Multi Image Aug data provided in 5th position
-                # Add mosaics into strong_labelled data at position 1 in data.
-                data = list(data)
-                multiimgaug_data = data[-1]
-                n_labeled = len(multiimgaug_data)//4
-                new_labeled_strong = []
-                new_labeled_weak = [] if data[0] is not None else None
-                labeled_strong = data[1]
-                mosaic_prob = 0.2
-                for i in range(n_labeled):
-                    data_dict = labeled_strong[i*4] if np.random.rand() > mosaic_prob else generate_mosaics(multiimgaug_data[i*4:i*4+4])[0]
-                    new_labeled_strong.append(data_dict)
-                    if new_labeled_weak is not None:
-                        new_labeled_weak.append(copy.deepcopy(data_dict))
-                data[0] = new_labeled_weak
-                data[1] = new_labeled_strong
-                data = data[:-1]
+            data = self.add_multiimg_aug(data)
             loss_dict = self.run_model(data)
             ##   End change   ##
 
@@ -196,6 +180,36 @@ class AMPTrainer(_AMPTrainer):
 
         self.grad_scaler.step(self.optimizer)
         self.grad_scaler.update()
+
+    def add_multiimg_aug(self, data, extra_imgs=3):
+        if len(data) == 6:  # Multi Image Aug data provided in 5th position
+            # Add mosaics into strong_labelled data at position 1 in data.
+            data = list(data)
+            labeled_multiimgaug_data = data[-2]
+            unlabeled_multiimgaug_data = data[-1]
+            batch_size = self.batch_size
+            if labeled_multiimgaug_data is not None and unlabeled_multiimgaug_data is not None:
+                batch_size = batch_size // 2 #todo: hack because the total _batch size is scaled between labeled and unlabeled.
+            if labeled_multiimgaug_data is not None:
+                n_multiimgaug = (len(labeled_multiimgaug_data) - batch_size) // extra_imgs
+                multiimgaug_data = labeled_multiimgaug_data[:n_multiimgaug * 4]
+                mosaics = [generate_mosaics(multiimgaug_data[i * 4:i * 4 + 4])[0] for i in range(n_multiimgaug)]
+                other_data = labeled_multiimgaug_data[n_multiimgaug * 4:]
+                data[1] = mosaics + other_data
+                #random.shuffle(data[1])
+                if data[0] is not None:
+                    data[0] = [copy.deepcopy(d) for d in data[1]]
+            if unlabeled_multiimgaug_data is not None:
+                n_unlabeled_multiimgaug = (len(unlabeled_multiimgaug_data) - batch_size) // extra_imgs
+                multiimgaug_data = unlabeled_multiimgaug_data[:n_unlabeled_multiimgaug * 4]
+                mosaics = [generate_mosaics(multiimgaug_data[i * 4:i * 4 + 4])[0] for i in range(n_unlabeled_multiimgaug)]
+                other_data = unlabeled_multiimgaug_data[n_unlabeled_multiimgaug * 4:]
+                data[3] = mosaics + other_data
+                #random.shuffle(data[3])
+                if data[2] is not None:
+                    data[2] = [copy.deepcopy(d) for d in data[3]]
+            data = data[:-2]
+        return data
 
     def run_model(self, data):
         return self.model(data)

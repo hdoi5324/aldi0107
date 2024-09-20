@@ -29,21 +29,62 @@ register_coco_instances("nudi_urchin3_train", {}, "datasets/collated_outputs/nud
 register_coco_instances("nudi_urchin3_test", {}, "datasets/collated_outputs/nudi_urchin3/annotations/instances_test2023.json", "datasets/collated_outputs/nudi_urchin3/test2023")
 
 # Urchin synthetic urchininf_v0
-register_coco_instances("urchininf_v0_train", {}, "datasets/collated_outputs/urchininf_v0/annotations/instances_train2023.json", "datasets/collated_outputs/urchininf_v0/train2023")
-register_coco_instances("urchininf_v0_test", {}, "datasets/collated_outputs/urchininf_v0/annotations/instances_test2023.json", "datasets/collated_outputs/urchininf_v0/test2023")
+register_coco_instances("urchininf_v0_train", {}, "datasets/collated_outputs/urchininf_v0/annotations/instances_train2023_urchin.json", "datasets/collated_outputs/urchininf_v0/train2023")
+register_coco_instances("urchininf_v0_train_all", {}, "datasets/collated_outputs/urchininf_v0/annotations/instances_train2023_all.json", "datasets/collated_outputs/urchininf_v0/train2023")
+register_coco_instances("urchininf_v0_test", {}, "datasets/collated_outputs/urchininf_v0/annotations/instances_test2023_urchin.json", "datasets/collated_outputs/urchininf_v0/test2023")
+register_coco_instances("urchininf_v0_test_all", {}, "datasets/collated_outputs/urchininf_v0/annotations/instances_test2023_all.json", "datasets/collated_outputs/urchininf_v0/test2023")
 
 # Urchin synthetic urchininf_rov_v1
-register_coco_instances("urchininf_rov_v1_train", {}, "datasets/collated_outputs/urchininf_rov_v1/annotations/instances_train2023.json", "datasets/collated_outputs/urchininf_rov_v1/train2023")
-register_coco_instances("urchininf_rov_v1_test", {}, "datasets/collated_outputs/urchininf_rov_v1/annotations/instances_test2023.json", "datasets/collated_outputs/urchininf_rov_v1/test2023")
+register_coco_instances("urchininf_rov_v1_train", {}, "datasets/collated_outputs/urchininf_rov_v1/annotations/instances_train2023_urchin.json", "datasets/collated_outputs/urchininf_rov_v1/train2023")
+register_coco_instances("urchininf_rov_v1_train_all", {}, "datasets/collated_outputs/urchininf_rov_v1/annotations/instances_train2023_all.json", "datasets/collated_outputs/urchininf_rov_v1/train2023")
+register_coco_instances("urchininf_rov_v1_test", {}, "datasets/collated_outputs/urchininf_rov_v1/annotations/instances_test2023_urchin.json", "datasets/collated_outputs/urchininf_rov_v1/test2023")
+register_coco_instances("urchininf_rov_v1_test_all", {}, "datasets/collated_outputs/urchininf_rov_v1/annotations/instances_test2023_all.json", "datasets/collated_outputs/urchininf_rov_v1/test2023")
+
+# Urchin synthetic urchininf_auv_v2
+register_coco_instances("urchininf_auv_v2_train", {}, "datasets/collated_outputs/nudi_urchin_auv_v2/annotations/instances_train2023_urchin.json", "datasets/collated_outputs/nudi_urchin_auv_v2/train2023")
+register_coco_instances("urchininf_auv_v2_train_all", {}, "datasets/collated_outputs/nudi_urchin_auv_v2/annotations/instances_train2023_all.json", "datasets/collated_outputs/nudi_urchin_auv_v2/train2023")
+register_coco_instances("urchininf_auv_v2_test", {}, "datasets/collated_outputs/nudi_urchin_auv_v2/annotations/instances_test2023_urchin.json", "datasets/collated_outputs/nudi_urchin_auv_v2/test2023")
+register_coco_instances("urchininf_auv_v2_test_all", {}, "datasets/collated_outputs/nudi_urchin_auv_v2/annotations/instances_test2023_all.json", "datasets/collated_outputs/nudi_urchin_auv_v2/test2023")
 
 
 # UDD
 register_coco_instances("UDD_test", {}, "datasets/UDD/annotations/instances_test2023_remap.json", "datasets/UDD/test2023")
 register_coco_instances("UDD_train", {}, "datasets/UDD/annotations/instances_train2023_remap.json", "datasets/UDD/train2023")
+register_coco_instances("UDD_train_split0", {}, "datasets/UDD/annotations/instances_train2023_remap_split0.json", "datasets/UDD/train2023")
+register_coco_instances("UDD_train_split100", {}, "datasets/UDD/annotations/instances_train2023_remap_split100.json", "datasets/UDD/train2023")
+register_coco_instances("UDD_train_split1", {}, "datasets/UDD/annotations/instances_train2023_remap_split1.json", "datasets/UDD/train2023")
+register_coco_instances("UDD_train_split2", {}, "datasets/UDD/annotations/instances_train2023_remap_split2.json", "datasets/UDD/train2023")
+register_coco_instances("UDD_train_split3", {}, "datasets/UDD/annotations/instances_train2023_remap_split3.json", "datasets/UDD/train2023")
+register_coco_instances("UDD_train_split4", {}, "datasets/UDD/annotations/instances_train2023_remap_split4.json", "datasets/UDD/train2023")
+register_coco_instances("UDD_train_split5", {}, "datasets/UDD/annotations/instances_train2023_remap_split5.json", "datasets/UDD/train2023")
+register_coco_instances("UDD_train_without_target", {}, "datasets/UDD/annotations/instances_train2023_remap_without_target.json", "datasets/UDD/train2023")
+register_coco_instances("UDD_train_with_target", {}, "datasets/UDD/annotations/instances_train2023_remap_with_target.json", "datasets/UDD/train2023")
 
 # Squidle
 register_coco_instances("squidle_urchin_2011_test", {}, "datasets/squidle_coco/squidle_urchin_2011/annotations/instances_test2023.json", "datasets/squidle_coco/squidle_urchin_2011/test2023")
 register_coco_instances("squidle_urchin_2009_train", {}, "datasets/squidle_coco/squidle_urchin_2009/annotations/instances_train2023.json", "datasets/squidle_coco/squidle_urchin_2009/train2023")
+register_coco_instances("squidle_urchin_2009_train_split100", {}, "datasets/squidle_coco/squidle_urchin_2009/annotations/instances_train2023_split100.json", "datasets/squidle_coco/squidle_urchin_2009/train2023")
+register_coco_instances("squidle_urchin_2009_train_split0", {}, "datasets/squidle_coco/squidle_urchin_2009/annotations/instances_train2023_split0.json", "datasets/squidle_coco/squidle_urchin_2009/train2023")
+register_coco_instances("squidle_urchin_2009_train_split1", {}, "datasets/squidle_coco/squidle_urchin_2009/annotations/instances_train2023_split1.json", "datasets/squidle_coco/squidle_urchin_2009/train2023")
+register_coco_instances("squidle_urchin_2009_train_split2", {}, "datasets/squidle_coco/squidle_urchin_2009/annotations/instances_train2023_split2.json", "datasets/squidle_coco/squidle_urchin_2009/train2023")
+register_coco_instances("squidle_urchin_2009_train_split3", {}, "datasets/squidle_coco/squidle_urchin_2009/annotations/instances_train2023_split3.json", "datasets/squidle_coco/squidle_urchin_2009/train2023")
+register_coco_instances("squidle_urchin_2009_train_split4", {}, "datasets/squidle_coco/squidle_urchin_2009/annotations/instances_train2023_split4.json", "datasets/squidle_coco/squidle_urchin_2009/train2023")
+register_coco_instances("squidle_urchin_2009_train_without_target", {}, "datasets/squidle_coco/squidle_urchin_2009/annotations/instances_train2023_without_target.json", "datasets/squidle_coco/squidle_urchin_2009/train2023")
+register_coco_instances("squidle_urchin_2009_train_with_target", {}, "datasets/squidle_coco/squidle_urchin_2009/annotations/instances_train2023_with_target.json", "datasets/squidle_coco/squidle_urchin_2009/train2023")
+register_coco_instances("squidle_east_tas_urchins_train", {}, "datasets/squidle_coco/squidle_east_tas_urchins/annotations/instances_train2023.json", "datasets/squidle_coco/squidle_east_tas_urchins/train2023")
+register_coco_instances("squidle_east_tas_urchins_train_split0", {}, "datasets/squidle_coco/squidle_east_tas_urchins/annotations/instances_train2023_split0.json", "datasets/squidle_coco/squidle_east_tas_urchins/train2023")
+register_coco_instances("squidle_east_tas_urchins_train_split1", {}, "datasets/squidle_coco/squidle_east_tas_urchins/annotations/instances_train2023_split1.json", "datasets/squidle_coco/squidle_east_tas_urchins/train2023")
+register_coco_instances("squidle_east_tas_urchins_train_split2", {}, "datasets/squidle_coco/squidle_east_tas_urchins/annotations/instances_train2023_split2.json", "datasets/squidle_coco/squidle_east_tas_urchins/train2023")
+register_coco_instances("squidle_east_tas_urchins_train_split3", {}, "datasets/squidle_coco/squidle_east_tas_urchins/annotations/instances_train2023_split3.json", "datasets/squidle_coco/squidle_east_tas_urchins/train2023")
+register_coco_instances("squidle_east_tas_urchins_train_split4", {}, "datasets/squidle_coco/squidle_east_tas_urchins/annotations/instances_train2023_split4.json", "datasets/squidle_coco/squidle_east_tas_urchins/train2023")
+register_coco_instances("squidle_east_tas_urchins_train_split5", {}, "datasets/squidle_coco/squidle_east_tas_urchins/annotations/instances_train2023_split5.json", "datasets/squidle_coco/squidle_east_tas_urchins/train2023")
+register_coco_instances("squidle_east_tas_urchins_train_split6", {}, "datasets/squidle_coco/squidle_east_tas_urchins/annotations/instances_train2023_split6.json", "datasets/squidle_coco/squidle_east_tas_urchins/train2023")
+register_coco_instances("squidle_east_tas_urchins_train_without_target", {}, "datasets/squidle_coco/squidle_east_tas_urchins/annotations/instances_train2023_without_target.json", "datasets/squidle_coco/squidle_east_tas_urchins/train2023")
+register_coco_instances("squidle_east_tas_urchins_train_with_target", {}, "datasets/squidle_coco/squidle_east_tas_urchins/annotations/instances_train2023_with_target.json", "datasets/squidle_coco/squidle_east_tas_urchins/train2023")
+
+register_coco_instances("squidle_pretrain_train", {}, "datasets/squidle_coco/handfish_iros/squidle_handfish_pretrain/annotations/instances_train2023.json", "datasets/squidle_coco/handfish_iros/squidle_handfish_pretrain/train2023")
+register_coco_instances("squidle_pretrain_test", {}, "datasets/squidle_coco/handfish_iros/squidle_handfish_pretrain/annotations/instances_test2023.json", "datasets/squidle_coco/handfish_iros/squidle_handfish_pretrain/test2023")
+
 
 # S-UODAC2020
 register_coco_instances("SUODAC2020_test", {}, "datasets/S-UODAC2020/COCO_Annotations/instances_target.json", "datasets/S-UODAC2020/test")

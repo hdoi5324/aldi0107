@@ -21,3 +21,15 @@ cd ..
 ln -s type7 test
 
 ```
+
+```commandline
+mkdir images
+cd images
+for f in `ls ../train2023/`; do ln -s ../train2023/$f; done
+for f in `ls ../test2023/`; do ln -s ../test2023/$f; done
+
+
+cd ..
+ln -s type7 test
+
+```

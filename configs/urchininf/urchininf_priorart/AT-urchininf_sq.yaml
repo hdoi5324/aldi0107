@@ -1,0 +1,4 @@
+_BASE_: "./AT-urchininf.yaml"
+DATASETS:
+  UNLABELED: ("squidle_urchin_2009_train","squidle_east_tas_urchins_train",)
+  TEST: ("squidle_urchin_2011_test",)

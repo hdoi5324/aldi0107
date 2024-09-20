@@ -1,4 +1,6 @@
 _BASE_: "../Base-RCNN-FPN-urchininf_strongaug_ema.yaml"
+MODEL:
+  FIND_UNUSED_PARAMETERS: True
 EMA:
   ENABLED: False
 DOMAIN_ADAPT:

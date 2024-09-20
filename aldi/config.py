@@ -11,6 +11,7 @@ def add_aldi_config(cfg):
     _C.DATASETS.UNLABELED = tuple()
     _C.DATASETS.BATCH_CONTENTS = ("labeled_weak", ) # one or more of: { "labeled_weak", "labeled_strong", "unlabeled_weak", "unlabeled_strong" }
     _C.DATASETS.BATCH_RATIOS = (1,) # must match length of BATCH_CONTENTS
+    _C.DATASETS.TRAIN_SIZE = 10e6 # Use to limit number of training images
 
     # Strong augmentations
     _C.AUG = CN()
@@ -22,6 +23,7 @@ def add_aldi_config(cfg):
     _C.AUG.MIC_RATIO = 0.5
     _C.AUG.MIC_BLOCK_SIZE = 32
     _C.AUG.MOSAIC = False
+    _C.AUG.MOSAIC_P = 0.25
 
     # EMA of student weights
     _C.EMA = CN()
@@ -120,3 +122,6 @@ def add_aldi_config(cfg):
     _C.LOGGING.ITERS = 100
     _C.LOGGING.TAGS = ""
     _C.LOGGING.GROUP_TAGS = ""
+
+    # For unlabeled data do not remove any images as we don't know whether they have annotations.
+    _C.DATALOADER.FILTER_UNLABELED_EMPTY_ANNOTATIONS = False

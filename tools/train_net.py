@@ -134,6 +134,6 @@ if __name__ == "__main__":
         num_machines=args.num_machines,
         machine_rank=args.machine_rank,
         dist_url=args.dist_url,
-        timeout=timedelta(minutes=1), # added for debugging
+        timeout=timedelta(minutes=10), # added for debugging
         args=(args,),
     )

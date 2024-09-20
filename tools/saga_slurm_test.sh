@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH --account=nn10058k --job-name=benthic_daod  # create a short name for your job
-#SBATCH --partition=accel --gpus=1
+#SBATCH --partition=a100 --gpus=2
 #SBATCH --time=2:0:0
 #SBATCH --nodes=1                # node count
 #SBATCH --ntasks-per-node=1      # total number of tasks per node
@@ -47,7 +47,7 @@ echo -n ${CONDA_PKGS_DIRS}
 
 CONDA_ENV="/cluster/projects/nn10058k/hdoi5324_daod/conda/py310_torch"
 
-#conda create --prefix ${CONDA_ENV}  python=3.10 -y
+conda create --prefix ${CONDA_ENV}  python=3.10 -y
 
 conda activate ${CONDA_ENV}
 echo -n "Activated env"

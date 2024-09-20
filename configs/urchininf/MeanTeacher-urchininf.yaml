@@ -1,6 +1,6 @@
 _BASE_: "./Base-RCNN-FPN-urchininf_strongaug_ema.yaml"
 MODEL:
-  WEIGHTS: "outputs/urchininf/urchininf_base_strongaug_ema/model_final.pth" 
+  WEIGHTS: "outputs/urchininf/base_strongaug_ema_inf_udd/model_final.pth"  #urchininf_base_strongaug_ema
 EMA:
   ENABLED: True
 DATASETS:
@@ -18,7 +18,7 @@ DOMAIN_ADAPT:
     HARD_RPN_REG_ENABLED: False
 SOLVER:
   IMS_PER_BATCH: 24
-  IMS_PER_GPU: 3
+  BASE_LR: 0.03
 OUTPUT_DIR: "outputs/urchininf/urchininf_MT/"
 LOGGING:
   TAGS: "RCCN-FPN,MT"
