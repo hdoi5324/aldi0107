@@ -6,18 +6,21 @@ from pycocotools.coco import COCO
 
 def main():
     #ann_files = ["datasets/squidle_coco/squidle_urchin_2009/annotations/instances_train2023.json", "datasets/squidle_coco/squidle_east_tas_urchins/annotations/instances_train2023.json"]
-    #ann_files = ["datasets/collated_outputs/urchininf_v0/annotations/instances_train2023_urchin.json", "datasets/collated_outputs/urchininf_rov_v1/annotations/instances_train2023_urchin.json", "datasets/collated_outputs/nudi_urchin_auv_v2/annotations/instances_train2023_urchin.json"]
+    ann_files = ["datasets/collated_outputs/urchininf_v0/annotations/instances_train2023_urchin.json", "datasets/collated_outputs/urchininf_rov_v1/annotations/instances_train2023_urchin.json", "datasets/collated_outputs/nudi_urchin_auv_v2/annotations/instances_train2023_urchin.json"]
     
-    ann_files = ["datasets/UDD/annotations/instances_train2023_remap.json"]
+    #ann_files = ["datasets/UDD/annotations/instances_train2023_remap.json"]
 
     coco_files = [COCO(f) for f in ann_files]
 
-    for f in ann_files:
-        split_file(f, COCO(f))
+    #for f in ann_files:
+    #    split_file(f, COCO(f))
 
     #combined_dataset = combine_coco(coco_files)
-
-
+    new_combined_file = "/home/heather/GitHub/aldi0107/datasets/collated_outputs/synthetic_urchin/annotations/instances_train2017.json"
+    with open(new_combined_file, "w") as fp:
+        json.dump(combined_dataset, fp)
+    print(f"Saved {new_combined_file}")
+    
     ## Separate with and without target
     #description = "Based on squidle_urchin_2009. Split by images with and without annotations"
     #coco = coco_files[0]

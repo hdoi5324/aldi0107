@@ -45,6 +45,25 @@ register_coco_instances("urchininf_auv_v2_train", {}, "datasets/collated_outputs
 register_coco_instances("urchininf_auv_v2_train_all", {}, "datasets/collated_outputs/nudi_urchin_auv_v2/annotations/instances_train2023_all.json", "datasets/collated_outputs/nudi_urchin_auv_v2/train2023")
 register_coco_instances("urchininf_auv_v2_test", {}, "datasets/collated_outputs/nudi_urchin_auv_v2/annotations/instances_test2023_urchin.json", "datasets/collated_outputs/nudi_urchin_auv_v2/test2023")
 register_coco_instances("urchininf_auv_v2_test_all", {}, "datasets/collated_outputs/nudi_urchin_auv_v2/annotations/instances_test2023_all.json", "datasets/collated_outputs/nudi_urchin_auv_v2/test2023")
+register_coco_instances("nudi_handfish_auv_v1_train", {}, "datasets/collated_outputs/nudi_handfish_auv_v1/annotations/instances_train2023.json", "datasets/collated_outputs/nudi_handfish_auv_v1/train2023")
+register_coco_instances("nudi_handfish_auv_v1_test", {}, "datasets/collated_outputs/nudi_handfish_auv_v1/annotations/instances_test2023.json", "datasets/collated_outputs/nudi_handfish_auv_v1/test2023")
+register_coco_instances("nudi_handfish_auv_v1_train_nowater", {}, "datasets/collated_outputs/nudi_handfish_auv_v1/annotations/instances_train2023.json", "datasets/collated_outputs/nudi_handfish_auv_v1/train2023_nowater")
+register_coco_instances("nudi_handfish_auv_v1_test_nowater", {}, "datasets/collated_outputs/nudi_handfish_auv_v1/annotations/instances_test2023.json", "datasets/collated_outputs/nudi_handfish_auv_v1/test2023_nowater")
+
+register_coco_instances("nudi_handfish_auv_v2_train", {}, "datasets/collated_outputs/nudi_handfish_auv_v2/annotations/instances_train2023.json", "datasets/collated_outputs/nudi_handfish_auv_v2/train2023")
+register_coco_instances("nudi_handfish_auv_v2_test", {}, "datasets/collated_outputs/nudi_handfish_auv_v2/annotations/instances_test2023.json", "datasets/collated_outputs/nudi_handfish_auv_v2/test2023")
+register_coco_instances("nudi_handfish_auv_v2_train_nowater", {}, "datasets/collated_outputs/nudi_handfish_auv_v2/annotations/instances_train2023.json", "datasets/collated_outputs/nudi_handfish_auv_v2/train2023_nowater")
+register_coco_instances("nudi_handfish_auv_v2_test_nowater", {}, "datasets/collated_outputs/nudi_handfish_auv_v2/annotations/instances_test2023.json", "datasets/collated_outputs/nudi_handfish_auv_v2/test2023_nowater")
+
+register_coco_instances("nudi_handfish_rov_v3_train", {}, "datasets/collated_outputs/nudi_handfish_rov_v3/annotations/instances_train2023.json", "datasets/collated_outputs/nudi_handfish_rov_v3/train2023")
+register_coco_instances("nudi_handfish_rov_v3_test", {}, "datasets/collated_outputs/nudi_handfish_rov_v3/annotations/instances_test2023.json", "datasets/collated_outputs/nudi_handfish_rov_v3/test2023")
+register_coco_instances("nudi_handfish_rov_v3_train_nowater", {}, "datasets/collated_outputs/nudi_handfish_rov_v3/annotations/instances_train2023.json", "datasets/collated_outputs/nudi_handfish_rov_v3/train2023_nowater")
+register_coco_instances("nudi_handfish_rov_v3_test_nowater", {}, "datasets/collated_outputs/nudi_handfish_rov_v3/annotations/instances_test2023.json", "datasets/collated_outputs/nudi_handfish_rov_v3/test2023_nowater")
+
+register_coco_instances("trench_handfish_auv_v1_train", {}, "datasets/collated_outputs/trench_handfish_auv_v1/annotations/instances_train2023.json", "datasets/collated_outputs/trench_handfish_auv_v1/train2023")
+register_coco_instances("trench_handfish_auv_v1_test", {}, "datasets/collated_outputs/trench_handfish_auv_v1/annotations/instances_test2023.json", "datasets/collated_outputs/trench_handfish_auv_v1/test2023")
+register_coco_instances("trench_handfish_auv_v1_train_nowater", {}, "datasets/collated_outputs/trench_handfish_auv_v1/annotations/instances_train2023.json", "datasets/collated_outputs/trench_handfish_auv_v1/train2023_nowater")
+register_coco_instances("trench_handfish_auv_v1_test_nowater", {}, "datasets/collated_outputs/trench_handfish_auv_v1/annotations/instances_test2023.json", "datasets/collated_outputs/trench_handfish_auv_v1/test2023_nowater")
 
 
 # UDD
@@ -84,6 +103,12 @@ register_coco_instances("squidle_east_tas_urchins_train_with_target", {}, "datas
 
 register_coco_instances("squidle_pretrain_train", {}, "datasets/squidle_coco/handfish_iros/squidle_handfish_pretrain/annotations/instances_train2023.json", "datasets/squidle_coco/handfish_iros/squidle_handfish_pretrain/train2023")
 register_coco_instances("squidle_pretrain_test", {}, "datasets/squidle_coco/handfish_iros/squidle_handfish_pretrain/annotations/instances_test2023.json", "datasets/squidle_coco/handfish_iros/squidle_handfish_pretrain/test2023")
+
+#Squidle handfish
+register_coco_instances("sq_hand_test15v2", {}, "datasets/squidle_coco/sq_hand_test15v2/annotations/instances_test2023.json", "datasets/squidle_coco/sq_hand_test15v2/test2023")
+register_coco_instances("sq_hand_train85_n200v2", {}, "datasets/squidle_coco/sq_hand_train85_n200v2/annotations/instances_train2023.json", "datasets/squidle_coco/sq_hand_train85_n200v2/train2023")
+register_coco_instances("squidle_handfish_15800_train", {}, "datasets/squidle_coco/squidle_handfish_15800/annotations/instances_train2023.json", "datasets/squidle_coco/squidle_handfish_15800/train2023")
+register_coco_instances("squidle_handfish_15800_test", {}, "datasets/squidle_coco/squidle_handfish_15800/annotations/instances_test2023.json", "datasets/squidle_coco/squidle_handfish_15800/test2023")
 
 
 # S-UODAC2020

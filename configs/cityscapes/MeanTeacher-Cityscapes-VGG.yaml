@@ -5,7 +5,7 @@
 # - bbox localization losses are disabled
 # - random erasing is used as part of the strong augs
 # - best standard burn-in checkpoint is used (baseline model trained w/o ema and strong augs)
-
+cr
 _BASE_: "./Base-RCNN-VGG-Cityscapes.yaml"
 MODEL:
   WEIGHTS: "models/cityscapes_vgg_baseline_foggy_val_model_best_222.pth"

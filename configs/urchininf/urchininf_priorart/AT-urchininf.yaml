@@ -3,9 +3,14 @@ DOMAIN_ADAPT:
   ALIGN:
     IMG_DA_ENABLED: True
     IMG_DA_IMPL: 'at'
+    IMG_DA_WEIGHT: 0.02
 SOLVER:
   STEPS: (8999,) # no lr decay
-  BASE_LR: 0.015
+  IMS_PER_BATCH: 16
+  BASE_LR: 0.02
 OUTPUT_DIR: "outputs/urchininf/urchininf_AT/"
 LOGGING:
   TAGS: "RCCN-FPN,AT"
+DATASETS:
+  BATCH_CONTENTS: ("labeled_strong", "unlabeled_strong")
+  BATCH_RATIOS: (1,1)
