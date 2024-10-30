@@ -1,10 +1,5 @@
-_BASE_: "../Base-RCNN-FPN.yaml"
-MODEL:
-  ROI_HEADS:
-    NUM_CLASSES: 1
+_BASE_: "Base-urchininf-data.yaml"
 DATASETS:
-  TRAIN: ("urchininf_v0_train","urchininf_rov_v1_train","urchininf_auv_v2_train",)
-  TEST: ("UDD_test",)
   BATCH_CONTENTS: ("labeled_weak", )
 EMA:
   ENABLED: False

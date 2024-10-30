@@ -19,7 +19,7 @@ from aldi.dropin import DefaultTrainer, AMPTrainer, SimpleTrainer
 #from aldi.dataloader import SaveWeakDatasetMapper, UMTDatasetMapper, UnlabeledSaveWeakDatasetMapper, UnlabeledUMTDatasetMapper, WeakStrongDataloader
 from aldi.dataloader import SaveWeakDatasetMapper, UnlabeledDatasetMapper, WeakStrongDataloader
 from aldi.ema import EMA
-from aldi.helpers import Detectron2COCOEvaluatorAdapter
+from aldi.helpers import Detectron2COCOEvaluatorAdapter, Detectron2COCOIOUEvaluatorAdapter
 from aldi.model import build_aldi
 
 DEBUG = False
@@ -173,6 +173,13 @@ class ALDITrainer(DefaultTrainer):
             output_folder = os.path.join(cfg.OUTPUT_DIR, "inference")
         return DatasetEvaluators([Detectron2COCOEvaluatorAdapter(dataset_name, output_dir=output_folder)])
 
+     @classmethod
+     def build_iou_evaluator(cls, cfg, dataset_name, output_folder=None):
+        """Just do COCO Evaluation."""
+        if output_folder is None:
+            output_folder = os.path.join(cfg.OUTPUT_DIR, "inference")
+        return DatasetEvaluators([Detectron2COCOIOUEvaluatorAdapter(dataset_name, output_dir=output_folder)])
+     
      def build_hooks(self):
           ret = super(ALDITrainer, self).build_hooks()
 

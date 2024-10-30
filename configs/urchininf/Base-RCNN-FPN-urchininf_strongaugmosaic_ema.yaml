@@ -1,20 +1,12 @@
 _BASE_: "Base-RCNN-FPN-urchininf_strongaug_ema.yaml"
-MODEL:
-  ROI_HEADS:
-    NUM_CLASSES: 1
 AUG:
   MOSAIC: True
   MOSAIC_P: 0.25
 DATASETS:
-  TRAIN: ("urchininf_v0_train","urchininf_rov_v1_train")
-  TEST: ("UDD_test",)
   BATCH_CONTENTS: ("labeled_strong", "labeled_multiimgaug",)
   BATCH_RATIOS: (1,0)
 EMA:
   ENABLED: True
-SOLVER:
-  IMS_PER_BATCH: 16
-  IMS_PER_GPU: 8
 OUTPUT_DIR: "outputs/urchininf/urchininf_base_strongaugmosaic025_ema/"
 LOGGING:
   TAGS: "Base,RCCN-FPN,StrongAugEMA,Mosaic0.25"

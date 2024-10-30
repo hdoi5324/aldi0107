@@ -62,6 +62,11 @@ def main(args):
             ema = EMA(ALDITrainer.build_model(cfg), cfg.EMA.ALPHA)
             ckpt.add_checkpointable("ema", ema)
         ckpt.resume_or_load(cfg.MODEL.WEIGHTS, resume=args.resume)
+
+        # Build evaluators
+        for idx, dataset_name in enumerate(cfg.DATASETS.TEST):
+            iou_evaluator = ALDITrainer.build_iou_evaluator(cfg, dataset_name)
+            iou_res = ALDITrainer.test(cfg, model, iou_evaluator)
         ## End change
         res = ALDITrainer.test(cfg, model)
         if cfg.TEST.AUG.ENABLED:
@@ -70,6 +75,8 @@ def main(args):
             verify_results(cfg, res)
 
             # Neptune logging results
+            for k in res.keys():
+                res[k].update(iou_res[k])
             run, hook = setup_neptune_logging(cfg.LOGGING.PROJECT, cfg.LOGGING.API_TOKEN, cfg.LOGGING.ITERS, cfg.LOGGING.TAGS, cfg.LOGGING.GROUP_TAGS, args.eval_only)
             hook.base_handler["config"] = stringify_unsupported(cfg)
             for j, u in res.items():
