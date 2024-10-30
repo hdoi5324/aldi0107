@@ -108,8 +108,7 @@ def main(args) -> None:
 
     scale = 1.0
     if args.source == "dataloader":
-        cfg['SOLVER']['IMS_PER_BATCH'] = 1
-        test_data_loader = build_detection_train_loader(cfg)
+        test_data_loader = ALDITrainer.build_test_loader(cfg, cfg['DATASETS']['TEST'])
         coco_data = list(chain.from_iterable([DatasetCatalog.get(k) for k in cfg.DATASETS.TEST]))
         coco_data = {c['image_id']: c for c in coco_data}
         for idx, batch in enumerate(test_data_loader):
