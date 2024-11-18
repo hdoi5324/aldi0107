@@ -29,7 +29,6 @@ from aldi.trainer import ALDITrainer
 import aldi.datasets # register datasets with Detectron2
 import aldi.model # register ALDI R-CNN model with Detectron2
 import aldi.backbone # register ViT FPN backbone with Detectron2
-from aldi.helpers import split_train_data
 
 
 def setup(args):
@@ -44,7 +43,6 @@ def setup(args):
 
     cfg.merge_from_file(args.config_file)
     cfg.merge_from_list(args.opts)
-    split_train_data(cfg)
     cfg.freeze()
     default_setup(cfg, args)
     return cfg

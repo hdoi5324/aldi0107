@@ -36,7 +36,7 @@ from .instances import FreeInstances
 from .proposal_utils import find_top_rpn_proposals
 from .utils import grad_zero
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('detectron2')
 
 @RPN_HEAD_REGISTRY.register()
 class GaussianRPNHead(StandardRPNHead):
@@ -363,7 +363,7 @@ class GaussianRPN(RPN):
         # check for inf/nan problems
         # TODO: track down why these are occurring in the first place
         if any([torch.isinf(v) or torch.isnan(v) for v in losses.values()]):
-            logger.warning(f"RPN loss is inf/nan, setting all to 0.")
+            logger.warning(f"aldi.rpn: RPN loss is inf/nan, setting all to 0.")
             losses = {k: torch.tensor(0, device="cuda") for k, v in losses.items()}
         return losses
 

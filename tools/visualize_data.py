@@ -80,8 +80,14 @@ def main(args) -> None:
     logger.info("Arguments: " + str(args))
     cfg = setup(args)
 
+    # Directory setup
     dirname = args.output_dir
     os.makedirs(dirname, exist_ok=True)
+    detections_dir = f"{dirname}/detections"
+    os.makedirs(detections_dir, exist_ok=True)
+    gt_dir = f"{dirname}/groundtruths"
+    os.makedirs(gt_dir, exist_ok=True)
+    
     metadata = MetadataCatalog.get(cfg.DATASETS.TEST[0])
 
     # Load model
@@ -90,10 +96,7 @@ def main(args) -> None:
 
     ## Change here
     ckpt = DetectionCheckpointerWithEMA(model, save_dir=cfg.OUTPUT_DIR)
-    if cfg.EMA.ENABLED and cfg.EMA.LOAD_FROM_EMA_ON_START:
-        ema = EMA(ALDITrainer.build_model(cfg), cfg.EMA.ALPHA)
-        ckpt.add_checkpointable("ema", ema)
-    ckpt.resume_or_load(cfg.MODEL.WEIGHTS)
+    ckpt.resume_or_load(cfg.MODEL.WEIGHTS, resume=False)
 
     def output(vis, fname):
         if vis is not None:
@@ -112,33 +115,48 @@ def main(args) -> None:
         coco_data = list(chain.from_iterable([DatasetCatalog.get(k) for k in cfg.DATASETS.TEST]))
         coco_data = {c['image_id']: c for c in coco_data}
         for idx, batch in enumerate(test_data_loader):
-            for i, inputs in enumerate(batch):
+            for _, inputs in enumerate(batch):
                 img = cv2.imread(inputs['file_name'])
+                img_filename = os.path.basename(inputs['file_name'])
                 #img = img.permute(1, 2, 0).cpu().detach().numpy()
                 img = utils.convert_image_to_rgb(img, cfg.INPUT.FORMAT)
 
                 visualizer = Visualizer(img, metadata=metadata, scale=scale)
                 dic = coco_data.get(inputs['image_id'], None)
-                if dic is not None:
-                    vis = draw_dataset_dict(visualizer, dic, color=(0, 255, 0))
 
-                # Get predictions
-                # todo: set threshold
-                #todo: check annotations 
+                # Save text file with bounding boxes
+                gt_path = os.path.join(gt_dir, f"{img_filename[:-4]}.txt")
+                with open(gt_path, 'w+') as f:
+                    for k in range(len(dic['annotations'])):
+                        a = dic['annotations'][k]
+                        label = metadata.thing_classes[a['category_id']]
+                        line = f"{label} {int(a['bbox'][0])} {int(a['bbox'][1])} {int(a['bbox'][2])} {int(a['bbox'][3])}\n"
+                        f.write(line)
+                vis = draw_dataset_dict(visualizer, dic, color=(0, 255, 0)) if dic is not None else img
+
+                # Get predictions/detections
                 outputs = model([inputs])[0]
                 target_fields = outputs["instances"].get_fields()
                 pred_boxes = target_fields.get("pred_boxes", None)
-                if pred_boxes is not None:
-                    pred_boxes = pred_boxes.to('cpu')
-                    labels = [f"{s.to('cpu'):.2f}" for s in target_fields.get("scores")]
+                if pred_boxes is not None and len(pred_boxes) > 0:
+                    pred_boxes = pred_boxes.tensor.detach().cpu().numpy()
+                    scores = [f"{s.to('cpu'):.2f}" for s in target_fields.get("scores")]
+                    scores_orig = [s.to('cpu') for s in target_fields.get("scores")]
+                    labels = [metadata.thing_classes[i] for i in target_fields["pred_classes"]]
 
-                #labels = [metadata.thing_classes[i] for i in target_fields["pred_classes"]]
-                vis = visualizer.overlay_instances(
-                    labels=labels,
-                    boxes=pred_boxes,
-                    assigned_colors=[(0,0,1.0)]*len(labels),
-                )
-                output(vis, f"{os.path.basename(inputs['file_name'])}")
+                    # Save text file with bounding boxes
+                    detection_path = os.path.join(detections_dir, f"{img_filename[:-4]}.txt")
+                    with open(detection_path, 'w+') as f:
+                        for k in range(len(pred_boxes)):
+                            box = pred_boxes[k].tolist()
+                            line = f"{labels[k]} {scores_orig[k]} {int(box[0])} {int(box[1])} {int(box[2])} {int(box[3])}\n"
+                            f.write(line)
+                    vis = visualizer.overlay_instances(
+                        labels=scores,
+                        boxes=pred_boxes,
+                        assigned_colors=[(0,0,1.0)]*len(labels),
+                    )
+                output(vis, f"{img_filename}")
     else:
         dicts = list(chain.from_iterable([DatasetCatalog.get(k) for k in cfg.DATASETS.TEST]))
         if cfg.MODEL.KEYPOINT_ON:

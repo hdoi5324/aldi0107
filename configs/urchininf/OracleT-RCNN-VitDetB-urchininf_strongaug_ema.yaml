@@ -1,4 +1,4 @@
-_BASE_: "../Base-RCNN-FPN.yaml"
+_BASE_: "../Base-RCNN-VitDetB.yaml"
 MODEL:
   ROI_HEADS:
     NUM_CLASSES: 1
@@ -8,6 +8,6 @@ DATASETS:
   BATCH_CONTENTS: ("labeled_strong", )
 EMA:
   ENABLED: True
-OUTPUT_DIR: "outputs/urchininf/urchininf_oracle_strongaug_ema_udd/"
+OUTPUT_DIR: "outputs/urchininf/urchininf_oracle_vitdetb_strongaug_ema_udd/"
 LOGGING:
-  TAGS: "RCCN-FPN,Oracle,StrongAugEMA"
+  TAGS: "RCCN-VitDetB,Oracle,StrongAugEMA"

@@ -1,0 +1,5 @@
+_BASE_: "Base-RCNN-FPN-urchininf_strongaug_ema.yaml"
+DATASETS:
+  TEST: ("squidle_urchin_2011_test",)
+  UNLABELED: ("squidle_urchin_2009_train","squidle_east_tas_urchins_train",)
+  BATCH_CONTENTS: ("labeled_weak", )

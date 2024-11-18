@@ -18,7 +18,7 @@ class DetectionCheckpointerWithEMA(DetectionCheckpointer):
     def resume_or_load(self, path: str, *, resume: bool = True) -> Dict[str, Any]:
         ret = super().resume_or_load(path, resume=resume)
         if (not resume) and path.endswith(".pth") and "ema" in ret.keys():
-            self.logger.info("Loading EMA weights as model starting point.")
+            self.logger.info("aldi.checkpoint: Loading EMA weights as model starting point.")
             ema_dict = {
                 k.replace('model.',''): v for k, v in ret['ema'].items()
             }

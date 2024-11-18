@@ -24,7 +24,7 @@ from aldi.model import build_aldi
 
 DEBUG = False
 debug_dict = {}
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("detectron2")
 
 def run_model_labeled_unlabeled(trainer, labeled_weak, labeled_strong, unlabeled_weak, unlabeled_strong):
      """
@@ -162,7 +162,7 @@ class ALDITrainer(DefaultTrainer):
      def build_model(cls, cfg):
           model = build_aldi(cfg)
           logger = logging.getLogger("detectron2")
-          logger.info("Model:\n{}".format(model))
+          logger.info("aldi.trainer: Model:\n{}".format(model))
           #print(model) # TODO: Not sure why logging not working
           return model
 
@@ -242,7 +242,7 @@ class ALDITrainer(DefaultTrainer):
                if len(labeled_dataset) > cfg.DATASETS.TRAIN_SIZE:
                     labeled_dataset = labeled_dataset[:cfg.DATASETS.TRAIN_SIZE]
                     logger = logging.getLogger("detectron2")
-                    logger.info("Reducing dataset size!!! : Dataset size is now {} with {} annotations".format(len(labeled_dataset), sum([len(img['annotations']) for img in labeled_dataset])))
+                    logger.info("aldi.trainer: Reducing dataset size!!! : Dataset size is now {} with {} annotations".format(len(labeled_dataset), sum([len(img['annotations']) for img in labeled_dataset])))
                labeled_loader = build_detection_train_loader(labeled_dataset, 
                     mapper=SaveWeakDatasetMapper(cfg, is_train=True, augmentations=get_augs(cfg, labeled=True, include_strong_augs="labeled_strong" in batch_contents)),
                     num_workers=cfg.DATALOADER.NUM_WORKERS,

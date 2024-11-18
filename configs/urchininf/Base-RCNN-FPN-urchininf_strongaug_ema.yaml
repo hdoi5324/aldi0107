@@ -3,6 +3,5 @@ DATASETS:
   BATCH_CONTENTS: ("labeled_strong", )
 EMA:
   ENABLED: True
-OUTPUT_DIR: "outputs/urchininf/base_strongaug_ema_udd/"
 LOGGING:
   TAGS: "Base,RCCN-FPN,StrongAugEMA"

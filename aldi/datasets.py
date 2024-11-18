@@ -109,6 +109,7 @@ register_coco_instances("sq_hand_test15v2", {}, "datasets/squidle_coco/sq_hand_t
 register_coco_instances("sq_hand_train85_n200v2", {}, "datasets/squidle_coco/sq_hand_train85_n200v2/annotations/instances_train2023.json", "datasets/squidle_coco/sq_hand_train85_n200v2/train2023")
 register_coco_instances("squidle_handfish_15800_train", {}, "datasets/squidle_coco/squidle_handfish_15800/annotations/instances_train2023.json", "datasets/squidle_coco/squidle_handfish_15800/train2023")
 register_coco_instances("squidle_handfish_15800_test", {}, "datasets/squidle_coco/squidle_handfish_15800/annotations/instances_test2023.json", "datasets/squidle_coco/squidle_handfish_15800/test2023")
+register_coco_instances("squidle_handfish_16511_train", {}, "datasets/squidle_coco/squidle_handfish_16511/annotations/instances_train2023.json", "datasets/squidle_coco/squidle_handfish_16511/train2023")
 
 
 # S-UODAC2020

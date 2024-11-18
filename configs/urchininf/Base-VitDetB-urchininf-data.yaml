@@ -1,4 +1,4 @@
-_BASE_: "../Base-RCNN-FPN.yaml"
+_BASE_: "../Base-RCNN-VitDetB.yaml"
 MODEL:
   ROI_HEADS:
     NUM_CLASSES: 1
@@ -8,4 +8,4 @@ DATASETS:
   UNLABELED: ("UDD_train",)
 SOLVER:
   IMS_PER_BATCH: 16
-  IMS_PER_GPU: 2
+  IMS_PER_GPU: 8

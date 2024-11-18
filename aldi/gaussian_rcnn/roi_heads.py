@@ -30,7 +30,7 @@ from .instances import FreeInstances
 from .proposal_utils import add_ground_truth_to_proposals
 from .fast_rcnn import GaussianFastRCNNOutputLayers
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("detectron2")
 
 @ROI_HEADS_REGISTRY.register()
 class GaussianROIHead(StandardROIHeads):
@@ -144,7 +144,7 @@ class GaussianROIHead(StandardROIHeads):
                 # check for inf/nan problems
                 # TODO: track down why these are occurring in the first place
                 if any([torch.isinf(v) or torch.isnan(v) for v in losses.values()]):
-                    logger.warning(f"ROI Heads loss is inf/nan, setting all to 0.")
+                    logger.warning(f"aldi.roi_heads: ROI Heads loss is inf/nan, setting all to 0.")
                     losses = {k: torch.tensor(0, device="cuda") for k, v in losses.items()}
                     
                 return losses

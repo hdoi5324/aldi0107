@@ -7,6 +7,5 @@ DATASETS:
   BATCH_RATIOS: (1,0)
 EMA:
   ENABLED: True
-OUTPUT_DIR: "outputs/urchininf/urchininf_base_strongaugmosaic025_ema/"
 LOGGING:
   TAGS: "Base,RCCN-FPN,StrongAugEMA,Mosaic0.25"

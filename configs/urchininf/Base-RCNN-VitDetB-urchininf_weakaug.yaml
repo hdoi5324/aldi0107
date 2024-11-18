@@ -1,7 +1,7 @@
-_BASE_: "Base-urchininf-data.yaml"
+_BASE_: "Base-VitDetB-urchininf-data.yaml"
 DATASETS:
   BATCH_CONTENTS: ("labeled_weak", )
 EMA:
   ENABLED: False
 LOGGING:
-  TAGS: "Base,RCCN-FPN,WeakAug"
+  TAGS: "Base,RCCN-VitDetB,WeakAug"

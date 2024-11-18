@@ -7,6 +7,8 @@ import os
 
 from detectron2.evaluation import COCOEvaluator
 from detectron2.evaluation.coco_evaluation import _evaluate_predictions_on_coco
+from detectron2.data.catalog import DatasetCatalog, MetadataCatalog
+from detectron2.data.datasets import load_coco_json
 
 import torch
 from pycocotools.coco import COCO
@@ -26,6 +28,9 @@ try:
     from detectron2.evaluation.fast_eval_api import COCOeval_opt
 except ImportError:
     COCOeval_opt = COCOeval
+
+import logging
+
 
 class SaveIO:
     """Simple PyTorch hook to save the output of a nn.module."""
@@ -125,7 +130,7 @@ class Detectron2COCOEvaluatorAdapter(COCOEvaluator):
         }[iou_type]
 
         if coco_eval is None:
-            self._logger.warn("No predictions from the model!")
+            self._logger.warn("aldi.helpers: No predictions from the model!")
             return {metric: float("nan") for metric in metrics}
 
         # the standard metrics
@@ -134,10 +139,10 @@ class Detectron2COCOEvaluatorAdapter(COCOEvaluator):
             for idx, metric in enumerate(metrics)
         }
         self._logger.info(
-            "Evaluation results for {}: \n".format(iou_type) + create_small_table(results)
+            "aldi.helpers: Evaluation results for {}: \n".format(iou_type) + create_small_table(results)
         )
         if not np.isfinite(sum(results.values())):
-            self._logger.info("Some metrics cannot be computed and is shown as NaN.")
+            self._logger.info("aldi.helpers: Some metrics cannot be computed and is shown as NaN.")
 
         if class_names is None or len(class_names) <= 1:
             return results
@@ -167,7 +172,7 @@ class Detectron2COCOEvaluatorAdapter(COCOEvaluator):
             headers=["category", "AP"] * (N_COLS // 2),
             numalign="left",
         )
-        self._logger.info("Per-category {} AP: \n".format(iou_type) + table)
+        self._logger.info("aldi.helpers: Per-category {} AP: \n".format(iou_type) + table)
 
         results.update({"AP-" + name: ap for name, ap in results_per_category})
 
@@ -192,7 +197,7 @@ class Detectron2COCOEvaluatorAdapter(COCOEvaluator):
             headers=["category", "AP"] * (N_COLS // 2),
             numalign="left",
         )
-        self._logger.info("Per-category {} AP50: \n".format(iou_type) + table)
+        self._logger.info("aldi.helpers: Per-category {} AP50: \n".format(iou_type) + table)
 
         results.update({"AP50-" + name: ap for name, ap in results_per_category})
 
@@ -205,7 +210,7 @@ class Detectron2COCOIOUEvaluatorAdapter(Detectron2COCOEvaluatorAdapter):
         """
         Evaluate predictions. Fill self._results with the metrics of the tasks.
         """
-        self._logger.info("Preparing results for COCO format ...")
+        self._logger.info("aldi.helpers: Preparing results for COCO format ...")
         coco_results = list(itertools.chain(*[x["instances"] for x in predictions]))
         tasks = self._tasks or self._tasks_from_predictions(coco_results)
 
@@ -228,13 +233,13 @@ class Detectron2COCOIOUEvaluatorAdapter(Detectron2COCOEvaluatorAdapter):
 
         if self._output_dir:
             file_path = os.path.join(self._output_dir, "coco_instances_results.json")
-            self._logger.info("Saving results to {}".format(file_path))
+            self._logger.info("aldi.helpers: Saving results to {}".format(file_path))
             with PathManager.open(file_path, "w") as f:
                 f.write(json.dumps(coco_results))
                 f.flush()
 
         if not self._do_evaluation:
-            self._logger.info("Annotations are not available for evaluation.")
+            self._logger.info("aldi.helpers: Annotations are not available for evaluation.")
             return
 
         self._logger.info(
@@ -316,3 +321,45 @@ class COCOeval_opt_IOU(COCOeval_opt):
             summarize = _summarizeDets
 
         self.stats = summarize()
+
+
+def split_train_data(cfg):
+    new_ds = []
+    cfg.DATASETS.UNLABELED = list(cfg.DATASETS.UNLABELED)
+    for name in cfg.DATASETS.TRAIN:
+        if '_split_' in name:
+            ds_name, num_split = name.split('_split_')
+            labelled, unlabelled = split_dataset_labelled_unlabelled(ds_name, int(num_split))
+            new_ds.append(labelled)
+            cfg.DATASETS.UNLABELED.append(unlabelled)
+        else:
+            new_ds.append(name)
+    cfg.DATASETS.TRAIN = new_ds
+    return cfg
+
+def split_dataset_labelled_unlabelled(dataset_name, num_labelled):
+    # get metadata
+    metadata = MetadataCatalog.get(dataset_name)
+
+    # get dataset and split indices
+    num_instances = len(DatasetCatalog.get(dataset_name))
+    indices = np.arange(num_instances)
+    np.random.shuffle(indices)
+    labelled_indices = indices[:num_labelled]
+    unlabelled_indices = indices[num_labelled:]
+
+    #register datasets
+    register_coco_instances_with_split(f"{dataset_name}_labelled", metadata, metadata.json_file, metadata.image_root, labelled_indices)
+    register_coco_instances_with_split(f"{dataset_name}_unlabelled", metadata, metadata.json_file, metadata.image_root, unlabelled_indices)
+    return f"{dataset_name}_labelled", f"{dataset_name}_unlabelled"
+
+def register_coco_instances_with_split(name, metadata, json_file, image_root, indices):
+    DatasetCatalog.register(name, lambda: load_coco_json_with_split(json_file, image_root, metadata.name, indices))
+    MetadataCatalog.get(name).set(
+        json_file=json_file, image_root=image_root, evaluator_type="coco", 
+    )
+def load_coco_json_with_split(json_file, image_root, parent_name, indices):
+    ds = load_coco_json(json_file, image_root, parent_name)
+    logger = logging.getLogger("detectron2")
+    logger.info("aldi.helpers: Splitting off {} images of {} images in COCO format from {}".format(len(indices), len(ds), json_file))
+    return [ds[index] for index in indices]
