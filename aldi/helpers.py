@@ -9,6 +9,7 @@ from detectron2.evaluation import COCOEvaluator
 from detectron2.evaluation.coco_evaluation import _evaluate_predictions_on_coco
 from detectron2.data.catalog import DatasetCatalog, MetadataCatalog
 from detectron2.data.datasets import load_coco_json
+from detectron2.data.build import filter_images_with_only_crowd_annotations
 
 import torch
 from pycocotools.coco import COCO
@@ -37,7 +38,7 @@ class SaveIO:
     def __init__(self):
         self.input = None
         self.output = None
-        
+
     def __call__(self, module, module_in, module_out):
         self.input = module_in
         self.output = module_out
@@ -329,7 +330,7 @@ def split_train_data(cfg):
     for name in cfg.DATASETS.TRAIN:
         if '_split_' in name:
             ds_name, num_split = name.split('_split_')
-            labelled, unlabelled = split_dataset_labelled_unlabelled(ds_name, int(num_split))
+            labelled, unlabelled = split_dataset_labelled_unlabelled(ds_name, int(num_split), filter_empty=cfg.DATALOADER.FILTER_EMPTY_ANNOTATIONS)
             new_ds.append(labelled)
             cfg.DATASETS.UNLABELED.append(unlabelled)
         else:
@@ -337,29 +338,34 @@ def split_train_data(cfg):
     cfg.DATASETS.TRAIN = new_ds
     return cfg
 
-def split_dataset_labelled_unlabelled(dataset_name, num_labelled):
+def split_dataset_labelled_unlabelled(dataset_name, num_labelled, filter_empty=True):
     # get metadata
     metadata = MetadataCatalog.get(dataset_name)
 
     # get dataset and split indices
-    num_instances = len(DatasetCatalog.get(dataset_name))
+    dataset_dicts = DatasetCatalog.get(dataset_name)
+    if filter_empty:
+        dataset_dicts = filter_images_with_only_crowd_annotations(dataset_dicts)
+    num_instances = len(dataset_dicts)
     indices = np.arange(num_instances)
     np.random.shuffle(indices)
     labelled_indices = indices[:num_labelled]
     unlabelled_indices = indices[num_labelled:]
 
     #register datasets
-    register_coco_instances_with_split(f"{dataset_name}_labelled", metadata, metadata.json_file, metadata.image_root, labelled_indices)
-    register_coco_instances_with_split(f"{dataset_name}_unlabelled", metadata, metadata.json_file, metadata.image_root, unlabelled_indices)
+    register_coco_instances_with_split(f"{dataset_name}_labelled", metadata, metadata.json_file, metadata.image_root, labelled_indices, filter_empty)
+    register_coco_instances_with_split(f"{dataset_name}_unlabelled", metadata, metadata.json_file, metadata.image_root, unlabelled_indices, filter_empty)
     return f"{dataset_name}_labelled", f"{dataset_name}_unlabelled"
 
-def register_coco_instances_with_split(name, metadata, json_file, image_root, indices):
-    DatasetCatalog.register(name, lambda: load_coco_json_with_split(json_file, image_root, metadata.name, indices))
+def register_coco_instances_with_split(name, metadata, json_file, image_root, indices, filter_empty):
+    DatasetCatalog.register(name, lambda: load_coco_json_with_split(json_file, image_root, metadata.name, indices, filter_empty))
     MetadataCatalog.get(name).set(
         json_file=json_file, image_root=image_root, evaluator_type="coco", 
     )
-def load_coco_json_with_split(json_file, image_root, parent_name, indices):
-    ds = load_coco_json(json_file, image_root, parent_name)
+def load_coco_json_with_split(json_file, image_root, parent_name, indices, filter_empty):
+    dataset_dicts = load_coco_json(json_file, image_root, parent_name)
+    if filter_empty:
+        dataset_dicts = filter_images_with_only_crowd_annotations(dataset_dicts)
     logger = logging.getLogger("detectron2")
-    logger.info("aldi.helpers: Splitting off {} images of {} images in COCO format from {}".format(len(indices), len(ds), json_file))
-    return [ds[index] for index in indices]
+    logger.info("aldi.helpers: Splitting off {} images of {} images in COCO format from {}".format(len(indices), len(dataset_dicts), json_file))
+    return [dataset_dicts[index] for index in indices]
