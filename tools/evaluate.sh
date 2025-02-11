@@ -1,20 +1,16 @@
 #!/bin/bash
 
-#OVERRIDE='DATASETS.TRAIN ("squidle_urchin_2009_train",) DATASETS.TEST ("squidle_urchin_2011_test",) DATASETS.UNLABELED ("squidle_urchin_2011_test",)'
-OVERRIDE='DATASETS.TEST ("SUODAC2020_test",) '
+OVERRIDE='DATASETS.TRAIN ("squidle_urchin_2009_train",) DATASETS.TEST ("squidle_urchin_2011_test",) DATASETS.UNLABELED ("squidle_urchin_2011_test",)'
+#OVERRIDE='DATASETS.TEST ("SUODAC2020_test",) '
 #OVERRIDE=""
-GROUP_TAGS='LOGGING.GROUP_TAGS "Inf2UDD,TEST"'
+GROUP_TAGS='LOGGING.GROUP_TAGS "Inf2Sq,TEST"'
 echo $OVERRIDE $GROUP_TAGS
-python tools/train_net.py --eval-only --config configs/urchininf/Base-RCNN-FPN-urchininf_strongaug_ema.yaml MODEL.WEIGHTS 'outputs/urchininf/urchininf_base_strongaug_ema/model_final.pth' ${OVERRIDE} ${GROUP_TAGS}
-#python tools/train_net.py --eval-only --config configs/urchininf/MeanTeacher-urchininf.yaml MODEL.WEIGHTS 'outputs/urchininf/urchininf_MT/model_final.pth' ${OVERRIDE} ${GROUP_TAGS}
-#python tools/train_net.py --eval-only --config configs/urchininf/urchininf_priorart/AT-urchininf.yaml MODEL.WEIGHTS 'outputs/urchininf/urchininf_AT/model_final.pth' ${OVERRIDE} ${GROUP_TAGS}
-#python tools/train_net.py --eval-only --config configs/urchininf/urchininf_priorart/SADA_urchininf.yaml MODEL.WEIGHTS 'outputs/urchininf/urchininf_SADA/model_final.pth' ${OVERRIDE} ${GROUP_TAGS}
-
-
-#python tools/train_net.py --eval-only --config configs/urchininf/Base-RCNN-FPN-urchininf_weakaug.yaml MODEL.WEIGHTS 'outputs/urchininf/urchininf_base_weakaug/model_final.pth'  ${OVERRIDE} ${GROUP_TAGS}
-#python tools/train_net.py --eval-only --config configs/urchininf/ALDI-urchininf.yaml MODEL.WEIGHTS 'outputs/urchininf/urchininf_ALDI/model_final.pth' ${OVERRIDE} ${GROUP_TAGS}
-#python tools/train_net.py --eval-only --config configs/urchininf/OracleT-RCNN-FPN-urchininf_strongaug_ema.yaml MODEL.WEIGHTS 'outputs/urchininf/urchininf_oracle_strongaug_ema/model_final.pth' ${OVERRIDE} ${GROUP_TAGS}
-#python tools/train_net.py --eval-only --config configs/urchininf/urchininf_priorart/MIC-urchininf_NoBurnIn.yaml MODEL.WEIGHTS 'outputs/urchininf/urchininf_MIC/model_final.pth' ${OVERRIDE} ${GROUP_TAGS}
+python tools/visualize_data.py --source dataloader --output-dir outputs/urchininf/base_strongaug_ema_inf_sq1000/squidle_urchin_2011_test --config configs/urchininf/Base-RCNN-FPN-urchininf_strongaug_ema_sq.yaml MODEL.WEIGHTS 'outputs/urchininf/base_strongaug_ema_inf_sq1000/model_final.pth' ${GROUP_TAGS}
+python tools/visualize_data.py --source dataloader --output-dir outputs/urchininf/mt_inf_sq/squidle_urchin_2011_test --config configs/urchininf/MeanTeacher-urchininf_sq.yaml MODEL.WEIGHTS 'outputs/urchininf/mt_inf_sq/model_final.pth' ${GROUP_TAGS}
+python tools/visualize_data.py --source dataloader --output-dir outputs/urchininf/aldi_inf_sq/squidle_urchin_2011_test --config configs/urchininf/ALDI-urchininf_sq.yaml MODEL.WEIGHTS 'outputs/urchininf/aldi_inf_sq/model_final.pth' ${GROUP_TAGS}
+python tools/visualize_data.py --source dataloader --output-dir outputs/urchininf/oracle_strongaug_ema_sq/squidle_urchin_2011_test --config configs/urchininf/OracleT-RCNN-FPN-urchininf_strongaug_ema_sq.yaml MODEL.WEIGHTS 'outputs/urchininf/oracle_strongaug_ema_sq/model_final.pth' ${GROUP_TAGS}
+python tools/visualize_data.py --source dataloader --output-dir outputs/urchininf/base_strongaug_ema_inf_udd1000/squidle_urchin_2011_test --config configs/urchininf/Base-RCNN-FPN-urchininf_strongaug_ema.yaml MODEL.WEIGHTS 'outputs/urchininf/base_strongaug_ema_inf_udd1000/model_final.pth' ${GROUP_TAGS}
 
 
 
+python tools/visualize_data.py --source dataloader --output-dir outputs/urchininf/mt_inf_udd/udd_test --config configs/urchininf/MeanTeacher-urchininf.yaml MODEL.WEIGHTS 'outputs/urchininf/mt_inf_udd/model_final.pth' ${GROUP_TAGS}
