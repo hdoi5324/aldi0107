@@ -109,7 +109,7 @@ def main(args) -> None:
                 print("Saving to {} ...".format(filepath))
                 vis.save(filepath)
 
-    scale = 1.0
+    scale = 1.5
     if args.source == "dataloader":
         test_data_loader = ALDITrainer.build_test_loader(cfg, cfg['DATASETS']['TEST'])
         coco_data = list(chain.from_iterable([DatasetCatalog.get(k) for k in cfg.DATASETS.TEST]))
@@ -121,7 +121,7 @@ def main(args) -> None:
                 #img = img.permute(1, 2, 0).cpu().detach().numpy()
                 img = utils.convert_image_to_rgb(img, cfg.INPUT.FORMAT)
 
-                visualizer = Visualizer(img, metadata=metadata, scale=scale)
+                visualizer = Visualizer(img, metadata=metadata, scale=scale, font_size_scale=scale)
                 dic = coco_data.get(inputs['image_id'], None)
 
                 # Save text file with bounding boxes
@@ -213,6 +213,7 @@ def draw_dataset_dict(visualiser, dic, color=(0, 0, 255)):
             class_names=names,
             is_crowd=[x.get("iscrowd", 0) for x in annos],
         )
+        masks = None
         visualiser.overlay_instances(
             labels=labels, boxes=boxes, masks=masks, keypoints=keypts, assigned_colors=colors
         )
