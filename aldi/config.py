@@ -122,6 +122,7 @@ def add_aldi_config(cfg):
     _C.LOGGING.ITERS = 100
     _C.LOGGING.TAGS = ""
     _C.LOGGING.GROUP_TAGS = ""
+    _C.LOGGING.PROXY = ""
 
     # For unlabeled data do not remove any images as we don't know whether they have annotations.
     _C.DATALOADER.FILTER_UNLABELED_EMPTY_ANNOTATIONS = False
