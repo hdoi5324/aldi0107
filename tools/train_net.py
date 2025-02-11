@@ -4,6 +4,7 @@
 Copied directly from detectron2/tools/train_net.py except where noted.
 """
 from datetime import timedelta
+import time
 import os
 import functools
 import logging
@@ -91,7 +92,7 @@ def main(args):
     trainer = ALDITrainer(cfg)
     trainer.resume_or_load(resume=args.resume)
     if comm.is_main_process():
-        run, hook = setup_neptune_logging(cfg.LOGGING.PROJECT, cfg.LOGGING.API_TOKEN, cfg.LOGGING.ITERS, cfg.LOGGING.TAGS, cfg.LOGGING.GROUP_TAGS)
+        run, hook = setup_neptune_logging(cfg.LOGGING.PROJECT, cfg.LOGGING.API_TOKEN, cfg.LOGGING.ITERS, cfg.LOGGING.TAGS, cfg.LOGGING.GROUP_TAGS, cfg.LOGGING.PROXY)
         trainer.register_hooks([hook])
     out = trainer.train()
     if comm.is_main_process():
@@ -100,8 +101,14 @@ def main(args):
 
     # Neptune logging
 @functools.lru_cache()
-def setup_neptune_logging(project, api_token, freq, tags, group_tags, eval_only=False):
-    run = neptune.init_run(project=project, api_token=api_token)
+def setup_neptune_logging(project, api_token, freq, tags, group_tags, proxy_server="", eval_only=False):
+    proxies = {}
+    if len(proxy_server) > 0:
+        proxies = { 
+                      "http"  : proxy_server, 
+                      "https" : proxy_server, 
+                    }
+    run = neptune_init_with_retry(project=project, api_token=api_token, proxies=proxies)
     if len(tags) > 0:
         run['sys/tags'].add(tags.split(','))
     if len(group_tags) > 0:
@@ -109,6 +116,19 @@ def setup_neptune_logging(project, api_token, freq, tags, group_tags, eval_only=
     hook = NeptuneHook(run=run, log_model=False, metrics_update_freq=freq)
     hook.base_handler["config/EVAL_ONLY"] = eval_only
     return run, hook
+    
+def neptune_init_with_retry(project, api_token, proxies, max_retries=100, delay=1):
+    retries = 0
+    while retries < max_retries:
+        try:
+            run = neptune.init_run(project=project, api_token=api_token, proxies=proxies)
+            print("Neptune run initialized successfully.")
+            return run
+        except neptune.exceptions.CannotResolveHostname as e:
+            retries += 1
+            print(f"Attempt {retries} failed: {e}. Retrying in {delay} seconds...")
+            time.sleep(delay)
+    raise Exception("Failed to initialize Neptune run after multiple attempts.")
 
 def adjust_lr_for_ims_per_gpu(cfg, world_size):
     """
