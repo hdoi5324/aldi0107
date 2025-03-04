@@ -9,9 +9,9 @@ DATASETS:
 EMA:
   ENABLED: True
 SOLVER:
-  STEPS: (2999,)
-  MAX_ITER: 3000
   CHECKPOINT_PERIOD: 1000
 TEST:
   EVAL_PERIOD: 100
-OUTPUT_DIR: "output/sim10k/sim10k_baseline_strongaug_ema/"
+OUTPUT_DIR: "outputs/sim10k/sim10k_baseline_strongaug_ema/"
+LOGGING:
+  TAGS: "Base,RCCN-FPN,StrongAugEMA"

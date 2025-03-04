@@ -1,6 +1,6 @@
 _BASE_: "./Base-RCNN-FPN-Sim10k_strongaug_ema.yaml"
 MODEL:
-  WEIGHTS: "outputs/sim10k/sim10k_baseline_strongaug_ema/model_final.pth"
+  WEIGHTS: "outputs/sim10k/sim10k_baseline_strongaug_ema/cityscapes_cars_val_model_best.pth"
 EMA:
   ENABLED: True
 DATASETS:
@@ -20,6 +20,6 @@ DOMAIN_ADAPT:
 #  STEPS: (59999,)
 #  MAX_ITER: 60000
 #  BACKWARD_AT_END: False
-OUTPUT_DIR: "outputs/sim10k/sim10k_MT/"
+OUTPUT_DIR: "outputs/sim10k/sim10k_MT_bestpre/"
 LOGGING:
-  TAGS: "RCCN-FPN,MT"
+  TAGS: "RCCN-FPN,MT_bestpre"
