@@ -128,7 +128,7 @@ def od_ice(model, data_loader, evaluator, lam=0.55, repeat=1):
                     'diff_ice': diff_ice,
                     'eval': evaluation['bbox']['AP50'],
                     'evaluation': evaluation,}
-    print(f"Same / Diff ICE {same_diff_ice}")
+    print(f"Same / Diff ICE {pprint.pprint(results_dict)}")
 
     return results_dict, image_level_features, proposal_level_features
 
@@ -299,7 +299,7 @@ def setup(args):
     return cfg
 
 
-def main(args, n=100000, lam=0.55, repeat=1):
+def main(args, n=10, lam=0.55, repeat=3):
     """
     Runs evaluation and visualizes features.
     """
@@ -340,9 +340,9 @@ def main(args, n=100000, lam=0.55, repeat=1):
 
         ckpt.resume_or_load(model_weights, resume=args.resume)
         
-        # Source eval
+        # Source eval todo: change this to source test
         source_eval = []
-        for idx, dataset_name in enumerate(cfg.DATASETS.TRAIN):
+        for idx, dataset_name in enumerate([d.replace('train', 'test') for d in cfg.DATASETS.TRAIN]):
             ds = get_detection_dataset_dicts(dataset_name, filter_empty=False)
             ds = ds[:min(n, len(ds))]
             train_data_loader = build_detection_test_loader(ds, mapper=DatasetMapper(cfg, is_train=False))
@@ -350,6 +350,7 @@ def main(args, n=100000, lam=0.55, repeat=1):
             evaluation = inference_on_dataset(model, train_data_loader, train_evaluator)
             source_eval.append(evaluation['bbox']['AP50'])
         outputs[model_name]['source_eval'] = source_eval
+        del train_data_loader, train_evaluator, evaluation, source_eval
 
         # Test evaluator
         evaluator = trainer.build_evaluator(cfg, test_dataset)

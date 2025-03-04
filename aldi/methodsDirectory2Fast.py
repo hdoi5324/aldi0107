@@ -119,11 +119,12 @@ def FIS(model, dataloader, evaluator, max_repeat=1, bos=False):
         #model.module.backbone.drop_nn = nn.Dropout(p=args.dropout_uncertainty)
         
         forward_hook_handle = model_copied.register_forward_hook(lambda module, input, output: preds_gallery_perturb.append(output))
-        backbone_hook_handle = model_copied.backbone.register_forward_hook(
-            lambda module, input, output: image_level_features.append(output))
+        # todo: take proposals into hook to calc same_box_logits
+        #backbone_hook_handle = model_copied.backbone.register_forward_hook(
+        #    lambda module, input, output: image_level_features.append(scores_for_proposals(output, proposals, model_copied)))
         _ = inference_on_dataset(model_copied, dataloader, evaluator=evaluator)
         forward_hook_handle.remove()
-        backbone_hook_handle.remove()
+        #backbone_hook_handle.remove()
         
         reg_list_perturbe = [x[0]["instances"].get("pred_boxes").tensor for x in preds_gallery_perturb]
         logits_perturbe = [x[0]["instances"].get("scores") for x in preds_gallery_perturb]
@@ -154,10 +155,10 @@ def FIS(model, dataloader, evaluator, max_repeat=1, bos=False):
             _logits = results_logits_per_img[img_idx]
             _logits_perturbe = results_logits_per_img_perturbe[img_idx]
 
-            _bboxes = torch.Tensor(_bboxes)
-            _bboxes_perturbe = torch.Tensor(_bboxes_perturbe)
-            _logits = torch.Tensor([l.reshape((1,)) for l in _logits])
-            _logits_perturbe = torch.Tensor([l.reshape((1,)) for l in _logits_perturbe])
+            _bboxes = torch.Tensor(np.array(_bboxes))
+            _bboxes_perturbe = torch.Tensor(np.array(_bboxes_perturbe))
+            _logits = torch.Tensor(np.array([l.reshape((1,)) for l in _logits]))
+            _logits_perturbe = torch.Tensor(np.array([l.reshape((1,)) for l in _logits_perturbe]))
 
             if len(_bboxes.shape) < 2 or len(_bboxes_perturbe.shape) < 2:
                 continue
@@ -188,10 +189,15 @@ def FIS(model, dataloader, evaluator, max_repeat=1, bos=False):
             # Mine
             giou_cost += giou_loss(_bboxes_perturbe[match_row,:], _bboxes[match_col, :], reduction="mean").item()            
             
+
+        assert len(preds_gallery) == len(dataloader)
+        for idx, inputs in enumerate(dataloader):
             props = [p['instances'] for p in preds_gallery[img_idx]]
             for p in props:
                 p.proposal_boxes = p.pred_boxes
-            _, orig_box_perturb_logit, _ = scores_for_proposals(image_level_features[img_idx], 
+            images = model_copied.preprocess_image(inputs)
+            image_level_feat = model_copied.backbone(images.tensor)            
+            _, orig_box_perturb_logit, _ = scores_for_proposals(image_level_feat, 
                                                           props,
                                                           model_copied.roi_heads)
             orig_box_perturb_logit = orig_box_perturb_logit[0].cpu()
