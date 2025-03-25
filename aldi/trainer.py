@@ -19,7 +19,7 @@ from aldi.dropin import DefaultTrainer, AMPTrainer, SimpleTrainer
 #from aldi.dataloader import SaveWeakDatasetMapper, UMTDatasetMapper, UnlabeledSaveWeakDatasetMapper, UnlabeledUMTDatasetMapper, WeakStrongDataloader
 from aldi.dataloader import SaveWeakDatasetMapper, UnlabeledDatasetMapper, WeakStrongDataloader
 from aldi.ema import EMA
-from aldi.helpers import Detectron2COCOEvaluatorAdapter, Detectron2COCOIOUEvaluatorAdapter
+from aldi.evaluation import Detectron2COCOEvaluatorAdapter, Detectron2COCOIOUEvaluatorAdapter
 from aldi.model import build_aldi
 
 DEBUG = False

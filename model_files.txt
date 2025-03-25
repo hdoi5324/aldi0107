@@ -1,0 +1,7 @@
+outputs/handfishinf/base_inf_sqall/model_final.pth
+outputs/handfishinf/oracle_weakaug_sq/model_final.pth
+outputs/handfishinf/base_inf_sqall/model_final.pth
+outputs/handfishinf/aldi_inf_sq/model_final.pth
+outputs/handfishinf/oracle_weakaug_sq/model_final.pth
+outputs/handfishinf/oracle_strongaug_ema_sq/model_final.pth
+outputs/handfishinf/base_strongaug_ema_sq/model_final.pth

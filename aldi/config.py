@@ -126,3 +126,10 @@ def add_aldi_config(cfg):
 
     # For unlabeled data do not remove any images as we don't know whether they have annotations.
     _C.DATALOADER.FILTER_UNLABELED_EMPTY_ANNOTATIONS = False
+
+    _C.MODEL_SELECTION = CN()
+    _C.MODEL_SELECTION.N_PERTURBATIONS = 3
+    _C.MODEL_SELECTION.SCORE_THRESHOLD = 0.5
+    _C.MODEL_SELECTION.DROPOUT = 0.1
+    _C.MODEL_SELECTION.SAMPLE = 50
+    
