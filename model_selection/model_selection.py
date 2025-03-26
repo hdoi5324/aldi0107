@@ -25,6 +25,7 @@ from detectron2.modeling import build_model
 from detectron2.utils.logger import log_every_n_seconds, _log_api_usage
 from fvcore.common.checkpoint import _IncompatibleKeys
 from detectron2.utils.events import EventStorage, get_event_storage
+from detectron2.structures import pairwise_iou, Boxes
 
 from aldi.config import add_aldi_config
 from aldi.evaluation import Detectron2COCOEvaluatorAdapter
@@ -205,8 +206,8 @@ class ModelSelection:
         
         # Hooks model.roi_heads._forward_box(features, proposals)
         loss_cls_on_gt_boxes = []
-        cls_loss_hook_handle = model.roi_heads.register_forward_hook(
-            lambda module, inputs, outputs: loss_cls_on_gt_boxes.append(classifier_loss_on_gt_boxes(module, inputs)))        
+        #cls_loss_hook_handle = model.roi_heads.register_forward_hook(
+        #    lambda module, inputs, outputs: loss_cls_on_gt_boxes.append(classifier_loss_on_gt_boxes(module, inputs)))        
         start_iter = 0
         self.iter = start_iter
         self.storage = EventStorage()
@@ -228,7 +229,7 @@ class ModelSelection:
                         total_compute_time = 0    
                     start_compute_time = time.perf_counter()
                     
-                    self.run_step(inputs, model)
+                    outputs = self.run_step(inputs, model)
                     
                     if torch.cuda.is_available():
                         torch.cuda.synchronize()
@@ -256,23 +257,25 @@ class ModelSelection:
             except Exception:
                 logger.exception("Exception during training:")
                 raise
-        cls_loss_hook_handle.remove()
+        #cls_loss_hook_handle.remove()
         losses_avg = {k: v._global_avg for k, v in self.storage.histories().items() if 'loss' in k}
         losses_avg['loss_cls_gt_boxes'] = np.mean(np.array(loss_cls_on_gt_boxes))
         return losses_avg
     
     
     def run_step(self, data, model):
-        assert model.training, "[ModelSelection] model was changed to eval mode!"
-        assert torch.cuda.is_available(), "[ModelSelection] CUDA is required for training!"
-    
         start = time.perf_counter()
         data_time = time.perf_counter() - start
-        loss_dict = model(data)
-    
-        if isinstance(loss_dict, torch.Tensor):
-            loss_dict = {"total_loss": loss_dict}
-        self._write_metrics(loss_dict, data_time) # Collates loss_dict
+        outputs = model(data)
+        batched_inputs = data
+        gt_instances = [x["instances"] for x in batched_inputs]
+        model.roi_heads.label_and_sample_proposals(outputs, gt_instances) # Need to attach the right gt to instances
+        match_quality_matrix = pairwise_iou(
+                gt_instances.gt_boxes, outputs.proposal_boxes
+            )
+            matched_idxs, matched_labels = self.proposal_matcher(match_quality_matrix)
+        # calculate outputs loss
+        self._write_metrics({}, data_time) # Collates loss_dict
 
 
     def get_updated_cfg_for_model_selection(self, cfg, dataset_name, seed_offset):
