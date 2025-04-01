@@ -8,7 +8,7 @@ from torch.nn import functional as F
 from detectron2.layers import cat, ciou_loss, diou_loss, cross_entropy
 from detectron2.structures import Boxes
 from detectron2.modeling.box_regression import Box2BoxTransform
-
+from detectron2.modeling.meta_arch.rcnn import GeneralizedRCNN
 from aldi.pseudolabeler import process_pseudo_label
 
 # Value for clamping large dw and dh predictions. The heuristic is that we clamp
@@ -79,40 +79,30 @@ def _mean_dense_box_regression_loss(
 
 
 def classifier_loss_on_gt_boxes(module, inputs):
-    """Called on StandardROIHeads to calculate classifier loss for no change in box proposals"""
-    _, features, proposals, targets = inputs
+    """Calculate the loss based on the difference in class prediction for the gt boxes."""
+    images, features, proposals, targets = inputs
     
-    proposals = module.label_and_sample_proposals(proposals, targets)
-    del targets
-    
-    filtered_props = []
-    for p in proposals:
-        if p.has('gt_boxes'):
-            filtered_props.append(p)
-        else:
-            p.set('gt_boxes', p.proposal_boxes.clone())
-            filtered_props.append(p)
-                  
-    proposals = filtered_props # filter where there are no boxes
-
     # based on _forward_box
-    features = [features[f].detach() for f in module.box_in_features]
-    gt_boxes = [x.gt_boxes for x in proposals]
-
-    box_features = module.box_pooler(features, gt_boxes)
-    box_features = module.box_head(box_features)
-    predictions = module.box_predictor(box_features)
-    del box_features, features
-
-    scores, proposal_deltas = predictions
-
-    #losses = module.box_predictor.losses(predictions, proposals)
-    # parse classification outputs
-    gt_classes = (
-        cat([p.gt_classes for p in proposals], dim=0) if len(proposals) else torch.empty(0)
-    )
-    if module.box_predictor.use_sigmoid_ce:
-        loss_cls = module.box_predictor.sigmoid_cross_entropy_loss(scores, gt_classes)
+    if targets is not None: # Need targets to do this
+        features = [features[f].detach() for f in module.box_in_features]
+        
+        # Get class predictions for gt-boxes
+        gt_boxes = [x.gt_boxes for x in targets]
+        box_features = module.box_pooler(features, gt_boxes)
+        box_features = module.box_head(box_features)
+        predictions = module.box_predictor(box_features)
+        del box_features
+        
+        scores, proposal_deltas = predictions
+    
+        gt_classes = (
+            cat([p.gt_classes for p in targets], dim=0) if len(targets) else torch.empty(0)
+        )
+        if module.box_predictor.use_sigmoid_ce:
+            loss_cls = module.box_predictor.sigmoid_cross_entropy_loss(scores, gt_classes)
+        else:
+            loss_cls = cross_entropy(scores, gt_classes, reduction="mean")    
+    
+        return loss_cls.detach().to("cpu").numpy()
     else:
-        loss_cls = cross_entropy(scores, gt_classes, reduction="mean")
-    return loss_cls.detach().to("cpu").numpy()
+        return None

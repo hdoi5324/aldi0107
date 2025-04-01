@@ -63,7 +63,7 @@ def main(args):
                               )
     
     # Get list of model weights - based on matching path
-    model_paths = sorted(glob.glob(os.path.join(cfg.OUTPUT_DIR, 'model_0*.pth')))
+    model_paths = sorted(glob.glob(os.path.join(cfg.OUTPUT_DIR, 'model_0*999.pth')))
     logger.info(f"model_selection: Models found: {model_paths}")
 
     # Log to Neptune

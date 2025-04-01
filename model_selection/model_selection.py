@@ -11,6 +11,7 @@ import numpy as np
 from collections import defaultdict, OrderedDict
 from typing import List, Mapping, Optional
 import torch
+from scipy.optimize import linear_sum_assignment
 
 import detectron2.data.transforms as T
 from detectron2.checkpoint import DetectionCheckpointer
@@ -24,8 +25,10 @@ from detectron2.evaluation import DatasetEvaluators
 from detectron2.modeling import build_model
 from detectron2.utils.logger import log_every_n_seconds, _log_api_usage
 from fvcore.common.checkpoint import _IncompatibleKeys
+from fvcore.nn.giou_loss import giou_loss
+
 from detectron2.utils.events import EventStorage, get_event_storage
-from detectron2.structures import pairwise_iou, Boxes
+from detectron2.structures import pairwise_iou, Boxes, BoxMode
 
 from aldi.config import add_aldi_config
 from aldi.evaluation import Detectron2COCOEvaluatorAdapter
@@ -96,7 +99,14 @@ class ModelSelection:
         """Just do COCO Evaluation."""
         if output_folder is None:
             output_folder = os.path.join(cfg.OUTPUT_DIR, "model_selection")
-        return DatasetEvaluators([Detectron2COCOEvaluatorAdapter(dataset_name, output_dir=output_folder)])
+        evaluator = DatasetEvaluators([Detectron2COCOEvaluatorAdapter(dataset_name, output_dir=output_folder)])
+        # Update evaluator to only check sampled images if it's a sampled dataset
+        if "_sample_" in dataset_name:
+            img_keys = [d['image_id'] for d in DatasetCatalog.get(dataset_name)]
+            evaluator._evaluators[0]._coco_api.imgs = {k: v for k, v in
+                                                       evaluator._evaluators[0]._coco_api.imgs.items() if
+                                                       k in img_keys}
+        return evaluator
 
     def build_hooks(self):
         """
@@ -141,6 +151,8 @@ class ModelSelection:
         outputs = {}
         model_shortname = self.model_shortname(model_weights)
         sampled_datasets = self.sampled_src if source else self.sampled_tgt
+        
+        # Iterate through sampled datasets
         for ds_idx, dataset_name in enumerate(sampled_datasets):
             self.load_model_weights(model_weights)
             unique_dataset_name = f"src_{dataset_name}_{ds_idx:02}" if source else f"tgt_{dataset_name}_{ds_idx:02}"
@@ -150,16 +162,10 @@ class ModelSelection:
 
             # og_test_dataset = DatasetCatalog.get(dataset_name)
             
-            ### Generate ground truth eval and pseudo label file in coco format
+            ### A) Generate Pseudo label for baseline for loss with perturbed model
             evaluator = ModelSelection.build_evaluator(cfg, dataset_name, self.evaluation_dir)
-            # Update evaluator to only check sampled images if it's a sampled dataset
-            if "_sample_" in dataset_name:
-                img_keys = [d['image_id'] for d in DatasetCatalog.get(dataset_name)]
-                evaluator._evaluators[0]._coco_api.imgs = {k: v for k, v in
-                                                           evaluator._evaluators[0]._coco_api.imgs.items() if
-                                                           k in img_keys}
-
             results = DefaultTrainer.test(self.cfg, self.model, evaluator)
+            
             outputs[unique_dataset_name].update(results['bbox'])  # Assumes bbox results
             logger.info(f"model_selection: Groundtruth for {dataset_name}, {model_shortname}: {pprint.pformat(results['bbox'])}")
             if neptune_run is not None:
@@ -171,7 +177,7 @@ class ModelSelection:
                                                                       cfg.MODEL_SELECTION.SCORE_THRESHOLD)
             register_coco_instances(pseudo_dataset_name, {}, dataset_file, "./")
 
-            ### Calculate losses/selection measures using pseudo label file as gt with perturbed_model          
+            ### B) Calculate losses with perturbed model against pseudo label coco annotations         
             losses_perturbed = defaultdict(list)
             for n_perturb in range(len(self.perturbation_masks)):
                 # Build data_loader
@@ -181,9 +187,21 @@ class ModelSelection:
                 model_copied = copy.deepcopy(self.model)
                 model_copied = perturb_by_dropout(model_copied, p=cfg.MODEL_SELECTION.DROPOUT, mask_dict=self.perturbation_masks[n_perturb])
 
+                # B1) Calculate classifier head loss with perturbed model using pseudo gt boxes
                 losses = self.run_dataset(data_loader, model_copied)
                 for k in losses.keys():
                     losses_perturbed[k].append(losses[k])
+                    
+                # B2) Calculate box loss with perturbed model compared to pseudo gt boxes
+                # Generate perturbed boxes by running inference with perturbed model
+                perturbed_evaluation_dir = os.path.join(self.evaluation_dir, 'perturbed')
+                evaluator = ModelSelection.build_evaluator(cfg, dataset_name, perturbed_evaluation_dir)
+                _ = DefaultTrainer.test(self.cfg, model_copied, evaluator)
+                
+                # Now take the results and compare to pseudo gt boxes
+                box_loss = calc_box_loss(pseudo_dataset_name, perturbed_evaluation_dir, threshold=cfg.MODEL_SELECTION.SCORE_THRESHOLD)
+                losses_perturbed['loss_box_perturbed'].append(box_loss)
+                
             losses_perturbed = {k: (float(np.average(v)), float(np.std(v))) for k, v in losses_perturbed.items() if
                                 "loss" in k}
             if neptune_run is not None:
@@ -196,18 +214,18 @@ class ModelSelection:
             
         return outputs
 
+
     def run_dataset(self, data_loader, model):
         # Run calculations over all of dataset
         logger.info("model_selection: Start calculations on dataset")
     
         model.training = True
         model.train() # put it in train so losses are calculated #todo: might be able to remove this
-        #hooks = [h for h in trainer._hooks if isinstance(h, LRScheduler) or isinstance(h, PeriodicWriter)]
         
-        # Hooks model.roi_heads._forward_box(features, proposals)
+        # Create hook on model.roi_heads._forward_box(features, proposals)
         loss_cls_on_gt_boxes = []
-        #cls_loss_hook_handle = model.roi_heads.register_forward_hook(
-        #    lambda module, inputs, outputs: loss_cls_on_gt_boxes.append(classifier_loss_on_gt_boxes(module, inputs)))        
+        cls_loss_hook_handle = model.roi_heads.register_forward_hook(
+            lambda module, inputs, outputs: loss_cls_on_gt_boxes.append(classifier_loss_on_gt_boxes(module, inputs)))        
         start_iter = 0
         self.iter = start_iter
         self.storage = EventStorage()
@@ -257,7 +275,7 @@ class ModelSelection:
             except Exception:
                 logger.exception("Exception during training:")
                 raise
-        #cls_loss_hook_handle.remove()
+        cls_loss_hook_handle.remove()
         losses_avg = {k: v._global_avg for k, v in self.storage.histories().items() if 'loss' in k}
         losses_avg['loss_cls_gt_boxes'] = np.mean(np.array(loss_cls_on_gt_boxes))
         return losses_avg
@@ -266,16 +284,10 @@ class ModelSelection:
     def run_step(self, data, model):
         start = time.perf_counter()
         data_time = time.perf_counter() - start
-        outputs = model(data)
-        batched_inputs = data
-        gt_instances = [x["instances"] for x in batched_inputs]
-        model.roi_heads.label_and_sample_proposals(outputs, gt_instances) # Need to attach the right gt to instances
-        match_quality_matrix = pairwise_iou(
-                gt_instances.gt_boxes, outputs.proposal_boxes
-            )
-            matched_idxs, matched_labels = self.proposal_matcher(match_quality_matrix)
-        # calculate outputs loss
-        self._write_metrics({}, data_time) # Collates loss_dict
+        model.training = True
+        model.train() 
+        losses = model(data) # model in training so targets are used
+        self._write_metrics(losses, data_time) # Collates loss_dict
 
 
     def get_updated_cfg_for_model_selection(self, cfg, dataset_name, seed_offset):
@@ -330,7 +342,7 @@ def save_pseudo_coco_file(model_weights, results_path, dataset_name, score_thres
     # Get annotations from results from last test run  
     coco_results_file = os.path.join(results_path, "coco_instances_results.json")
     with open(coco_results_file, 'r') as file:
-        print(f"Loading results from {coco_results_file}")
+        logger.info(f"model_selection: Loading results from {coco_results_file}")
         psuedo_annotations = json.load(file)
     ann_by_image = defaultdict(list)
     for ann in psuedo_annotations:
@@ -381,9 +393,58 @@ def save_pseudo_coco_file(model_weights, results_path, dataset_name, score_thres
 
     with open(dataset_file, "w") as fp:
         json.dump(psuedo_coco_dataset, fp)
-    print(
-        f"Saving new coco file with psuedo labels from dataset {dataset_name} and model weights {model_weights} at {dataset_file}")
+    logger.info(f"model_selection: Saving new coco file with psuedo labels from dataset {dataset_name} and model weights {model_weights} at {dataset_file}")
     return dataset_file, model_dataset_name
+
+
+def calc_box_loss(dataset_name, perturbed_results_dir, threshold=0.5):
+    # compare results and calc box loss
+    logger.info("model_selection: Calculating box loss")
+    dataset_images = DatasetCatalog.get(dataset_name)
+    dataset_metadata = MetadataCatalog.get(dataset_name)
+    # unmap the category mapping ids for COCO
+    if hasattr(dataset_metadata, "thing_dataset_id_to_contiguous_id"):
+        reverse_id_mapping = {v: k for k, v in dataset_metadata.thing_dataset_id_to_contiguous_id.items()}
+        reverse_id_mapper = lambda contiguous_id: reverse_id_mapping[contiguous_id]  # noqa
+    else:
+        reverse_id_mapper = lambda contiguous_id: contiguous_id  # noqa    
+        
+    # Remove annotations which are the ground truth
+    #for d in dataset_images:
+    #    d["id"] = d["image_id"]
+    #    del d["image_id"]
+    #    del d['annotations']
+        
+    # Get annotations from results from last test run  
+    coco_results_file = os.path.join(perturbed_results_dir, "coco_instances_results.json")
+    with open(coco_results_file, 'r') as file:
+        logger.info(f"model_selection: Calculating box loss - Loading results from {coco_results_file}")
+        perturbed_annotations = json.load(file)
+    perturbed_ann_by_image = defaultdict(list)
+    for ann in perturbed_annotations:
+        if ann['score'] > threshold:
+            ann['category_id'] = dataset_metadata.thing_dataset_id_to_contiguous_id[ann['category_id']]
+            perturbed_ann_by_image[ann['image_id']].append(ann)
+    
+    #match_quality = 0
+    box_loss = []
+    no_matches = []
+    for instance in dataset_images:
+        perturbed_anns = perturbed_ann_by_image[instance["image_id"]]
+        perturbed_boxes = np.array([BoxMode.convert(a["bbox"], BoxMode.XYWH_ABS, BoxMode.XYXY_ABS) for a in perturbed_anns])
+        pseudo_anns = instance['annotations']
+        pseudo_boxes = np.array([BoxMode.convert(a["bbox"], a["bbox_mode"], BoxMode.XYXY_ABS) for a in pseudo_anns])
+        #max_match = min(len(perturbed_anns), len(pseudo_anns))
+        # Match boxes using Faster-RCNN matching quality (from detectron2.modelling.proposal_generator.rpn)
+        match_quality_matrix = pairwise_iou(Boxes(perturbed_boxes), Boxes(pseudo_boxes)) # gt rows, perturb cols
+        match_row, match_col = linear_sum_assignment(match_quality_matrix, maximize=True)
+        if len(match_row) == 0:
+            no_matches.append(instance["image_id"])
+            continue
+        #match_quality += match_quality_matrix[match_row, match_col].sum().numpy().tolist() / max_match
+        box_loss.append(giou_loss(torch.Tensor(perturbed_boxes[match_row,:]), torch.Tensor(pseudo_boxes[match_col, :]), reduction="mean").item())
+    logger.info(f"model_selection: No matched boxes found for image_ids {no_matches}")
+    return np.mean(box_loss)
 
 
 def register_coco_instances_with_split(name, parent, json_file, image_root, indices, filter_empty):
