@@ -13,6 +13,8 @@ from typing import List, Mapping, Optional
 import torch
 from scipy.optimize import linear_sum_assignment
 
+import torch.nn.functional as F
+from torchvision.ops import complete_box_iou_loss
 import detectron2.data.transforms as T
 from detectron2.checkpoint import DetectionCheckpointer
 from detectron2.config import get_cfg
@@ -199,8 +201,10 @@ class ModelSelection:
                 _ = DefaultTrainer.test(self.cfg, model_copied, evaluator)
                 
                 # Now take the results and compare to pseudo gt boxes
-                box_loss = calc_box_loss(pseudo_dataset_name, perturbed_evaluation_dir, threshold=cfg.MODEL_SELECTION.SCORE_THRESHOLD)
-                losses_perturbed['loss_box_perturbed'].append(box_loss)
+                box_losses = calc_box_loss(pseudo_dataset_name, perturbed_evaluation_dir, threshold=cfg.MODEL_SELECTION.SCORE_THRESHOLD)
+                losses_perturbed['loss_box_giou'].append(box_losses[0])
+                losses_perturbed['loss_box_smooth_l1'].append(box_losses[1])
+                losses_perturbed['loss_box_iou'].append(box_losses[2])
                 
             losses_perturbed = {k: (float(np.average(v)), float(np.std(v))) for k, v in losses_perturbed.items() if
                                 "loss" in k}
@@ -427,7 +431,7 @@ def calc_box_loss(dataset_name, perturbed_results_dir, threshold=0.5):
             perturbed_ann_by_image[ann['image_id']].append(ann)
     
     #match_quality = 0
-    box_loss = []
+    giou_losses, smooth_l1_losses, iou_losses = [], [], []
     no_matches = []
     for instance in dataset_images:
         perturbed_anns = perturbed_ann_by_image[instance["image_id"]]
@@ -442,9 +446,14 @@ def calc_box_loss(dataset_name, perturbed_results_dir, threshold=0.5):
             no_matches.append(instance["image_id"])
             continue
         #match_quality += match_quality_matrix[match_row, match_col].sum().numpy().tolist() / max_match
-        box_loss.append(giou_loss(torch.Tensor(perturbed_boxes[match_row,:]), torch.Tensor(pseudo_boxes[match_col, :]), reduction="mean").item())
+        giou_l = giou_loss(torch.Tensor(perturbed_boxes[match_row,:]), torch.Tensor(pseudo_boxes[match_col, :]), reduction="mean").item()
+        iou_l = complete_box_iou_loss(torch.Tensor(perturbed_boxes[match_row,:]), torch.Tensor(pseudo_boxes[match_col, :]), reduction="mean").item()
+        smooth_l1_l = F.smooth_l1_loss(torch.Tensor(perturbed_boxes[match_row,:]), torch.Tensor(pseudo_boxes[match_col, :]), reduction="mean").item()
+        giou_losses.append(giou_l)
+        smooth_l1_losses.append(smooth_l1_l)
+        iou_losses.append(iou_l)
     logger.info(f"model_selection: No matched boxes found for image_ids {no_matches}")
-    return np.mean(box_loss)
+    return np.mean(giou_losses), np.mean(smooth_l1_losses), np.mean(iou_losses)
 
 
 def register_coco_instances_with_split(name, parent, json_file, image_root, indices, filter_empty):
@@ -496,7 +505,6 @@ def get_dataset_samples(dataset_names, n=250):
     for ds in dataset_names:
         samples = samples + split_dataset_into_samples(ds, sample_size=n)
     return samples
-
 
 
 
