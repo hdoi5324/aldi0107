@@ -84,6 +84,7 @@ def classifier_loss_on_gt_boxes(module, inputs):
     
     # based on _forward_box
     if targets is not None: # Need targets to do this
+        #todo: change this to compare to raw scores from gt
         features = [features[f].detach() for f in module.box_in_features]
         
         # Get class predictions for gt-boxes

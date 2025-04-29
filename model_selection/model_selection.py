@@ -12,11 +12,11 @@ from collections import defaultdict, OrderedDict
 from typing import List, Mapping, Optional
 import torch
 from scipy.optimize import linear_sum_assignment
+import pandas as pd
 
 import torch.nn.functional as F
 from torchvision.ops import complete_box_iou_loss
 import detectron2.data.transforms as T
-from detectron2.checkpoint import DetectionCheckpointer
 from detectron2.config import get_cfg
 from detectron2.data.build import filter_images_with_only_crowd_annotations, build_detection_train_loader
 from detectron2.data.samplers import InferenceSampler
@@ -26,8 +26,8 @@ from detectron2.engine import DefaultTrainer, PeriodicWriter, SimpleTrainer, Hoo
 from detectron2.evaluation import DatasetEvaluators
 from detectron2.modeling import build_model
 from detectron2.utils.logger import log_every_n_seconds, _log_api_usage
-from fvcore.common.checkpoint import _IncompatibleKeys
 from fvcore.nn.giou_loss import giou_loss
+from utils import load_model_weights
 
 from detectron2.utils.events import EventStorage, get_event_storage
 from detectron2.structures import pairwise_iou, Boxes, BoxMode
@@ -49,7 +49,7 @@ logger = logging.getLogger("detectron2")
 
 
 class ModelSelection:
-    def __init__(self, cfg, source_ds, target_ds=None, n_samples=250, dropout=0.1, n_perturbations=3, gather_metric_period=1):
+    def __init__(self, cfg, source_ds, target_ds=None, n_samples=250, dropout=0.1, n_perturbations=3, gather_metric_period=1, transformed_src=3):
         self._hooks: List[HookBase] = []
         self.iter: int = 0
         self.start_iter: int = 0
@@ -66,35 +66,21 @@ class ModelSelection:
         # Calculate dropout_masks so they can be used consistently throughout experiments
         self.perturbation_masks = [dropout_masks(self.model, p=dropout) for _ in range(n_perturbations)]
 
-        self.sampled_src = get_dataset_samples(source_ds, n=n_samples)
-        self.sampled_tgt = get_dataset_samples(target_ds, n=n_samples) if target_ds is not None else []
+        if transformed_src >0:
+            new_source_ds = []
+            for i in range(transformed_src):
+                new_source_ds += [f"{s_ds}_transformed{i}" for s_ds in source_ds]
+            new_source_ds += source_ds
+            source_ds = new_source_ds
+        self.sampled_src = get_dataset_samples(source_ds, n=n_samples)[:6]
+        self.sampled_tgt = get_dataset_samples(target_ds, n=1000000) if target_ds is not None else []
 
         self.evaluation_dir = os.path.join(cfg.OUTPUT_DIR, "model_selection")
         self.gather_metric_period = gather_metric_period
         
     def model_shortname(self, model_weights):
-        model_weights[-17:-4] #todo: make more robust
+        return os.path.basename(model_weights)[:-4]
 
-
-    def load_model_weights(self, path):
-        checkpointer = DetectionCheckpointer(self.model)  
-        ret = checkpointer.load(path)
-
-        if path.endswith(".pth") and "ema" in ret.keys():
-            # self.logger.info("Loading EMA weights as model starting point.")
-            ema_dict = {
-                k.replace('model.', ''): v for k, v in ret['ema'].items()
-            }
-            # incompatible = self.model.load_state_dict(ema_dict, strict=False)
-            ret['model'] = ema_dict
-            incompatible = checkpointer._load_model(ret)
-            if incompatible is not None:
-                checkpointer._log_incompatible_keys(_IncompatibleKeys(
-                    missing_keys=incompatible.missing_keys,
-                    unexpected_keys=incompatible.unexpected_keys,
-                    incorrect_shapes=[]
-                ))
-        return ret
 
     @classmethod
     def build_evaluator(cls, cfg, dataset_name, output_folder=None):
@@ -110,26 +96,25 @@ class ModelSelection:
                                                        k in img_keys}
         return evaluator
 
-    def build_hooks(self):
-        """
-        Build a list of default hooks, including timing, writing events.
 
-        Returns:
-            list[HookBase]:
-        """
-        cfg = self.cfg.clone()
-        cfg.defrost()
-        cfg.DATALOADER.NUM_WORKERS = 0  # save some memory and time for PreciseBN
-
-        ret = [
-            hooks.IterationTimer(),
-        ]
-
-        if comm.is_main_process():
-            # Here the default print/log frequency of each writer is used.
-            # run writers in the end, so that evaluation metrics are written
-            ret.append(hooks.PeriodicWriter(self.build_writers(), period=20))
-        return ret    
+    @classmethod
+    def save_outputs(cls, outputs, evaluation_dir, filename='model_selection.json'):
+        flat_results = []
+        columns = None
+        for m in outputs:
+            for ds in outputs[m]:
+                if columns is None:
+                    columns = ["model", "dataset"] + list(outputs[m][ds].keys())
+                model_dataset = [m, ds]
+                data = [v for v in outputs[m][ds].values()]
+                flat_results.append(model_dataset + data)
+        df = pd.DataFrame(flat_results, columns=columns)
+        for l in df.columns:
+            if 'loss' in l:
+                df[f"{l}_std"] = df[l].apply(lambda x: x[1])
+                df[l] = df[l].apply(lambda x: x[0])
+        output_file = os.path.join(evaluation_dir, filename)
+        df.to_json(output_file)   
         
     def _write_metrics(
         self,
@@ -154,9 +139,13 @@ class ModelSelection:
         model_shortname = self.model_shortname(model_weights)
         sampled_datasets = self.sampled_src if source else self.sampled_tgt
         
+        total = len(sampled_datasets)
+        info_freq = 5
+        start_time = time.perf_counter()
+        
         # Iterate through sampled datasets
         for ds_idx, dataset_name in enumerate(sampled_datasets):
-            self.load_model_weights(model_weights)
+            load_model_weights(model_weights, self.model)
             unique_dataset_name = f"src_{dataset_name}_{ds_idx:02}" if source else f"tgt_{dataset_name}_{ds_idx:02}"
             outputs[unique_dataset_name] = {'source': source}
             
@@ -201,7 +190,7 @@ class ModelSelection:
                 _ = DefaultTrainer.test(self.cfg, model_copied, evaluator)
                 
                 # Now take the results and compare to pseudo gt boxes
-                box_losses = calc_box_loss(pseudo_dataset_name, perturbed_evaluation_dir, threshold=cfg.MODEL_SELECTION.SCORE_THRESHOLD)
+                box_losses = calc_box_loss(pseudo_dataset_name, perturbed_evaluation_dir)
                 losses_perturbed['loss_box_giou'].append(box_losses[0])
                 losses_perturbed['loss_box_smooth_l1'].append(box_losses[1])
                 losses_perturbed['loss_box_iou'].append(box_losses[2])
@@ -215,7 +204,12 @@ class ModelSelection:
                         neptune_run[f"metrics/{model_shortname}/{unique_dataset_name}/{k}_std"] = v[1]
             logger.info(f"model_selection: Perturbed loss for {dataset_name}, {model_shortname}: {pprint.pformat(losses_perturbed)}")
             outputs[unique_dataset_name].update(losses_perturbed)
-            
+                
+            iters_after_start = ds_idx + 1
+            total_seconds_per_iter = (time.perf_counter() - start_time) / iters_after_start
+            if ds_idx % info_freq == 0 or ds_idx == total - 1:
+                eta = datetime.timedelta(seconds=int(total_seconds_per_iter * (total - ds_idx - 1)))
+                logger.info(f"Model selection for {model_shortname} done {ds_idx + 1}/{total} sampled datasets. Total for {len(self.perturbation_masks)} perturbations: {total_seconds_per_iter:.4f} s/iter. ETA={eta}")
         return outputs
 
 
@@ -301,6 +295,8 @@ class ModelSelection:
         cfg.DATASETS.TRAIN = (dataset_name,)
         cfg.INPUT.MIN_SIZE_TRAIN = 1024
         cfg.INPUT.MAX_SIZE_TRAIN = 1024
+        cfg.INPUT.MIN_SIZE_TEST = 1024
+        cfg.INPUT.MAX_SIZE_TEST = 1024        
         cfg.INPUT.RANDOM_FLIP = "none"
         cfg.DATASETS.TEST = cfg.DATASETS.TRAIN
         cfg.freeze()

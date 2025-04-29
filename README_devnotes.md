@@ -7,3 +7,8 @@ rsync -avr -e "ssh -i ~/.ssh/goby_ronin.pem" --copy-links /home/heather/GitHub/a
 ubuntu@spiny.volta.edu.au:/home/ubuntu/GitHub/aldi0107
 
 ```
+
+
+```commandline
+pip3 install torch torchvision --index-url https://download.pytorch.org/whl/cu118
+```

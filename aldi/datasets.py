@@ -97,4 +97,17 @@ register_coco_instances("squidle_handfish_16511_train", {}, "datasets/squidle_co
 register_coco_instances("SUODAC2020_test", {}, "datasets/S-UODAC2020/COCO_Annotations/instances_target.json", "datasets/S-UODAC2020/test")
 register_coco_instances("SUODAC2020_train", {}, "datasets/S-UODAC2020/COCO_Annotations/instances_source.json", "datasets/S-UODAC2020/train")
 
+# Transformed
+register_coco_instances("urchininf_v0_train_transformed0", {}, "datasets/collated_outputs/urchininf_v0/annotations/instances_train2023_urchin.json", "datasets/collated_outputs/urchininf_v0/train2023_transformed_0")
+register_coco_instances("urchininf_rov_v1_train_transformed0", {}, "datasets/collated_outputs/urchininf_rov_v1/annotations/instances_train2023_urchin.json", "datasets/collated_outputs/urchininf_rov_v1/train2023_transformed_0")
+register_coco_instances("urchininf_auv_v2_train_transformed0", {}, "datasets/collated_outputs/nudi_urchin_auv_v2/annotations/instances_train2023_urchin.json", "datasets/collated_outputs/nudi_urchin_auv_v2/train2023_transformed_0")
+register_coco_instances("urchininf_v0_train_transformed1", {}, "datasets/collated_outputs/urchininf_v0/annotations/instances_train2023_urchin.json", "datasets/collated_outputs/urchininf_v0/train2023_transformed_1")
+register_coco_instances("urchininf_rov_v1_train_transformed1", {}, "datasets/collated_outputs/urchininf_rov_v1/annotations/instances_train2023_urchin.json", "datasets/collated_outputs/urchininf_rov_v1/train2023_transformed_1")
+register_coco_instances("urchininf_auv_v2_train_transformed1", {}, "datasets/collated_outputs/nudi_urchin_auv_v2/annotations/instances_train2023_urchin.json", "datasets/collated_outputs/nudi_urchin_auv_v2/train2023_transformed_1")
+register_coco_instances("urchininf_v0_train_transformed2", {}, "datasets/collated_outputs/urchininf_v0/annotations/instances_train2023_urchin.json", "datasets/collated_outputs/urchininf_v0/train2023_transformed_2")
+register_coco_instances("urchininf_rov_v1_train_transformed2", {}, "datasets/collated_outputs/urchininf_rov_v1/annotations/instances_train2023_urchin.json", "datasets/collated_outputs/urchininf_rov_v1/train2023_transformed_2")
+register_coco_instances("urchininf_auv_v2_train_transformed2", {}, "datasets/collated_outputs/nudi_urchin_auv_v2/annotations/instances_train2023_urchin.json", "datasets/collated_outputs/nudi_urchin_auv_v2/train2023_transformed_2")
 
+register_coco_instances("sim10k_cars_train_transformed0", {"image_dir_prefix": "datasets/sim10k/images", "translated_image_dir": f"datasets/daod-strong-baseline-cyclegan-results/sim10k2cityscapes/test_20/images/fake_A"},             "datasets/sim10k/coco_car_annotations.json",                  "datasets/sim10k/images_transformed_0/")
+register_coco_instances("sim10k_cars_train_transformed1", {"image_dir_prefix": "datasets/sim10k/images", "translated_image_dir": f"datasets/daod-strong-baseline-cyclegan-results/sim10k2cityscapes/test_20/images/fake_A"},             "datasets/sim10k/coco_car_annotations.json",                  "datasets/sim10k/images_transformed_1/")
+register_coco_instances("sim10k_cars_train_transformed2", {"image_dir_prefix": "datasets/sim10k/images", "translated_image_dir": f"datasets/daod-strong-baseline-cyclegan-results/sim10k2cityscapes/test_20/images/fake_A"},             "datasets/sim10k/coco_car_annotations.json",                  "datasets/sim10k/images_transformed_2/")

@@ -80,27 +80,13 @@ def main(args):
         outputs[model_weights] = model_output_src
         model_output_tgt = selector.run_model_selection(model_weights, source=False, neptune_run=run) 
         outputs[model_weights].update(model_output_tgt)
+                    
+        # Save outputs in case you want to quit early
+        if comm.is_main_process():
+            ModelSelection.save_outputs(outputs, selector.evaluation_dir)
         
     if comm.is_main_process():
         logger.info(f"model_selection: output: {pprint.pformat(outputs)}")
-        
-        flat_results = []
-        columns = None
-        for m in outputs:
-            for ds in outputs[m]:
-                if columns is None:
-                    columns = ["model", "dataset"] + list(outputs[m][ds].keys())
-                model_dataset = [m, ds]
-                data = [v for v in outputs[m][ds].values()]
-                flat_results.append(model_dataset + data)
-        df = pd.DataFrame(flat_results, columns=columns)
-        for l in df.columns:
-            if 'loss' in l:
-                df[f"{l}_std"] = df[l].apply(lambda x: x[1])
-                df[l] = df[l].apply(lambda x: x[0])
-        output_file = os.path.join(cfg.OUTPUT_DIR, 'model_selection/model_selection.json')
-        df.to_json(output_file)
-        logger.info(f"model_selection: Saved results to {output_file}")
 
         if run is not None:    
             run['metrics/tgt_datasets'] = selector.sampled_tgt
