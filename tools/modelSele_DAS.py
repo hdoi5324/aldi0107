@@ -189,6 +189,11 @@ def main(args):
     model_dirs = sorted(glob.glob(os.path.join(cfg.OUTPUT_DIR, 'model_0*99.pth')))    
     result, all_result_dict = calculateMultiFast(cfg, model_dirs, [FIS, PDR])
     print(result)
+
+    #todo: Add DAS calculation.  Normalise FIS, PDR across all models then add.
+    # iterate through methods
+    # get all method scores and normalise
+    # Sum
     
     # Save outputs to file
     all_result_dict['output_dir'] = cfg.OUTPUT_DIR

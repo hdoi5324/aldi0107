@@ -77,6 +77,7 @@ def FIS(cfg, model, dataloaders, max_repeat):
     forward_hook_handle.remove()
 
     reg_list = [x[0]["instances"].get("pred_boxes").tensor for x in preds_gallery]
+    #todo: should "scores" have logits applied.
     logits = [x[0]["instances"].get("scores") for x in preds_gallery]    # Notion: Softmax before returning.
 
     results_bbox_per_img = []
@@ -210,8 +211,8 @@ def getPrototypes(model, dataloader, useBackboneFeature=True, featureNames=["vgg
         features = model.backbone(images.tensor)
         proposals, _ = model.proposal_generator(images, features, None)
 
-        features = [features[f] for f in featureNames]
-        backboneFeatureList.append(torch.mean(features[0], dim=(2,3)))
+        features = [features[f] for f in featureNames] #todo: could do this without feature names.  Just take all the features returned.
+        backboneFeatureList.append(torch.mean(features[0], dim=(2,3))) # Takes first feature name only. Not used later.
 
         box_features_backbone = model.roi_heads.box_pooler(features, [x.proposal_boxes for x in proposals])  # [1000, 512, 7, 7]
         box_features_mlp = model.roi_heads.box_head(box_features_backbone)  # [1000, 1024]
