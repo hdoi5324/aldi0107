@@ -1,4 +1,5 @@
 import glob
+import json
 import detectron2.utils.comm as comm
 from detectron2.checkpoint import DetectionCheckpointer
 from detectron2.config import get_cfg
@@ -128,8 +129,10 @@ def calculateMultiFast(cfg, model_dirs: list, method_functions: list, repeat=1):
     for method_function in method_functions:
         METHODS_DICT[method_function.__name__] = []
     
+    all_results = {}
     for model_dir in model_dirs:
         # [MAIN]
+        all_results[os.path.basename(model_dir)] = {}
         for method_function in method_functions:
             # 1 model construction
             model = build_model(cfg)
@@ -149,13 +152,17 @@ def calculateMultiFast(cfg, model_dirs: list, method_functions: list, repeat=1):
                                           [dataloader_source, dataloader_target],
                                           repeat)
             
+            
             for key in list(result_dict.keys()):
                 if key not in list(METHODS_DICT.keys()) and key != 'score':
                     METHODS_DICT[key] = [result_dict[key]]
+                    all_results[os.path.basename(model_dir)][key] = result_dict[key]
                 elif key != "score":
                     METHODS_DICT[key].append(result_dict[key])
+                    all_results[os.path.basename(model_dir)][key] = result_dict[key]
                 else:
                     METHODS_DICT[method_function.__name__].append(result_dict['score'])
+                    all_results[os.path.basename(model_dir)][method_function.__name__] = result_dict['score']
 
             maxKeyLength = max(len(key) for key in METHODS_DICT.keys())
             print()
@@ -163,7 +170,7 @@ def calculateMultiFast(cfg, model_dirs: list, method_functions: list, repeat=1):
                 print(f"'{key:<{maxKeyLength}}'\t: {METHODS_DICT[key]},")
             time.sleep(5)
 
-    return METHODS_DICT
+    return METHODS_DICT, all_results
 
 
 
@@ -179,14 +186,22 @@ def main(args):
     #assert args.eval_only, "Only eval-only mode supported."
     #assert cfg.SEMISUPNET.Trainer == "ateacher"
 
-    #model_dir = "/home/heather/GitHub/aldi/outputs/sim10k/sim10k_baseline_strongaug_ema"
     model_dirs = sorted(glob.glob(os.path.join(cfg.OUTPUT_DIR, 'model_0*99.pth')))    
-    result = calculateMultiFast(cfg, model_dirs, [FIS, PDR])
+    result, all_result_dict = calculateMultiFast(cfg, model_dirs, [FIS, PDR])
     print(result)
     
-    #todo: store data in useful format
-
-    return None
+    # Save outputs to file
+    all_result_dict['output_dir'] = cfg.OUTPUT_DIR
+    all_result_dict['target_dataset'] = cfg.DATASETS.TEST[0]
+    all_result_dict['source_dataset'] = cfg.DATASETS.TRAIN
+    all_result_dict['config_file'] = args.config_file
+    with open(os.path.join(cfg.OUTPUT_DIR, 'DAS_outputs.json'), 'w') as file:
+        json.dump(all_result_dict, file)
+        
+    with open(os.path.join(cfg.OUTPUT_DIR, 'DAS_outputs.json'), 'r') as file:
+        data = json.load(file)
+    
+    return data
 
 
 if __name__ == "__main__":
