@@ -1,11 +1,11 @@
-from adapteacher.engine.trainer import ATeacherTrainer
+#from adapteacher.engine.trainer import ATeacherTrainer
 from scipy.optimize import linear_sum_assignment
 import copy
 import torch
 import torch.nn.functional as F
 
 def FIS(cfg, model, dataloaders, max_repeat, bos=False):
-    evaluator = ATeacherTrainer.build_evaluator(cfg, cfg.DATASETS.TEST[0])
+    evaluator = None # ATeacherTrainer.build_evaluator(cfg, cfg.DATASETS.TEST[0])
     dataloader = dataloaders[1]
     torch.set_grad_enabled(False)
 
@@ -88,15 +88,16 @@ def FIS(cfg, model, dataloaders, max_repeat, bos=False):
 
 def PDR(cfg, model, dataloaders, max_repeat):
     USE_BACKBONE_FEATURE = True
+    SEMISUPNET_DIS_TYPE = ["p2","p3","p4","p5"] #todo: review which features should be used.
     assert len(dataloaders) == 2
     torch.set_grad_enabled(False)
     model.eval()
 
     dataloader_source, dataloader_target = dataloaders
     proto_target, _ = getPrototypes(model, dataloader_target,
-                                                         USE_BACKBONE_FEATURE, [cfg.SEMISUPNET.DIS_TYPE])
+                                                         USE_BACKBONE_FEATURE, SEMISUPNET_DIS_TYPE)
     proto_source, _ = getPrototypes(model, dataloader_source,
-                                                         USE_BACKBONE_FEATURE, [cfg.SEMISUPNET.DIS_TYPE])
+                                                         USE_BACKBONE_FEATURE, SEMISUPNET_DIS_TYPE)
     
     dist = calCateProtoDistance(proto_source, proto_target)
     
