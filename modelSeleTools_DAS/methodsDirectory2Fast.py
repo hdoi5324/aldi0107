@@ -1,19 +1,83 @@
+import os
+import numpy as np
+
 #from adapteacher.engine.trainer import ATeacherTrainer
+from detectron2.evaluation import inference_on_dataset
+from detectron2.evaluation import DatasetEvaluators
+from aldi.evaluation import Detectron2COCOEvaluatorAdapter
+
 from scipy.optimize import linear_sum_assignment
 import copy
 import torch
 import torch.nn.functional as F
 
-def FIS(cfg, model, dataloaders, max_repeat, bos=False):
-    evaluator = None # ATeacherTrainer.build_evaluator(cfg, cfg.DATASETS.TEST[0])
+
+def perturb_model_parameters(module):
+    # Based on DAS.  rcnn.py in DAobjTwoStagePseudoLabGeneralizedRCNN.inference method.
+    # Applies perturbation to model rather than in the model class.
+    
+    # todo: check this works!
+    if not hasattr(module, 'original_params'):
+        module.original_params = None
+    if module.original_params is None: # Perturb model once
+        ignoreNames = "D_img"
+
+        stds = []
+        print("saving original parameters...")
+        module.original_params = {}
+        for name, param in module.named_parameters():
+            if ignoreNames in name:
+                continue
+            module.original_params[name] = param.clone()
+            std = param.std().item()
+            stds.append(std) if not np.isnan(std) else ...
+        # print(np.mean(stds))
+        step = 1 # * np.exp(np.mean(std))
+        print("step is setted to {}".format(step))
+
+        n_params = sum([
+            p.numel() for n, p in module.named_parameters() if not ignoreNames in n
+        ])
+        random_vector = torch.rand(n_params)
+        direction = (random_vector / torch.norm(random_vector)).cuda() * step
+
+        offset = 0
+        for n, p in module.named_parameters():
+            if ignoreNames in n:
+                continue
+            size = p.numel()
+            ip = direction[offset:offset+size].view(p.shape)
+            p.data = module.original_params[n] + ip
+            offset += size
+        print("Finished perturbing.")
+    return module
+
+def build_DAS_evaluator(cfg, dataset_name, output_folder=None):
+    """Just do COCO Evaluation."""
+    if output_folder is None:
+        output_folder = os.path.join(cfg.OUTPUT_DIR, "DAS")
+    evaluator = DatasetEvaluators([Detectron2COCOEvaluatorAdapter(dataset_name, output_dir=output_folder)])
+    return evaluator
+
+
+def FIS(cfg, model, dataloaders, max_repeat):
+    #evaluator = ATeacherTrainer.build_evaluator(cfg, cfg.DATASETS.TEST[0])
     dataloader = dataloaders[1]
+    evaluator = build_DAS_evaluator(cfg, dataset_name=cfg.DATASETS.TEST[0])
     torch.set_grad_enabled(False)
 
-    res, preds_gallery = ATeacherTrainer.test(cfg, model, evaluators=[evaluator],
-                                              data_loader=dataloader, perturb=False)
+    #res, preds_gallery = ATeacherTrainer.test(cfg, model, evaluators=[evaluator],
+    #                                          data_loader=dataloader, perturb=False)
+    #data_loader = ALDITrainer.build_test_loader(cfg, dataset)
+    
+    # Updated DAS - use forward hook to get preds_gallery
+    preds_gallery = []
+    forward_hook_handle = model.register_forward_hook(lambda module, input, output: preds_gallery.append(output))
+    res = inference_on_dataset(model, dataloader, evaluator=evaluator)
+    forward_hook_handle.remove()
 
     reg_list = [x[0]["instances"].get("pred_boxes").tensor for x in preds_gallery]
-    logits = [x[0]["instances"].get("scores_logits") for x in preds_gallery]    # Notion: Softmax before returning.
+    logits = [x[0]["instances"].get("scores") for x in preds_gallery]    # Notion: Softmax before returning.
 
     results_bbox_per_img = []
     results_logits_per_img = []
@@ -32,10 +96,20 @@ def FIS(cfg, model, dataloaders, max_repeat, bos=False):
         _lambda = lambdas[repeat_time]
         print("\nrepeat time: {}".format(repeat_time))
         model_copied = copy.deepcopy(model)
-        _, preds_gallery_perturb = ATeacherTrainer.test(cfg, model_copied, evaluators=[evaluator], 
-                                                        data_loader=dataloader, perturb=True)
+        # Updated DAS - apply perturbation to model rather than in model code
+        model_copied = perturb_model_parameters(model_copied)
+
+        #_, preds_gallery_perturb = ATeacherTrainer.test(cfg, model_copied, evaluators=[evaluator], 
+        #                                                data_loader=dataloader, perturb=True)
+        
+        # Updated DAS - use forward hook for preds_gallery_perturb and perturb model prior
+        preds_gallery_perturb = []        
+        forward_hook_handle = model_copied.register_forward_hook(lambda module, input, output: preds_gallery_perturb.append(output))
+        _ = inference_on_dataset(model_copied, dataloader, evaluator=evaluator)
+        forward_hook_handle.remove()
+
         reg_list_perturbe = [x[0]["instances"].get("pred_boxes").tensor for x in preds_gallery_perturb]
-        logits_perturbe = [x[0]["instances"].get("scores_logits") for x in preds_gallery_perturb]
+        logits_perturbe = [x[0]["instances"].get("scores") for x in preds_gallery_perturb]
 
         results_bbox_per_img_perturbe = []
         results_logits_per_img_perturbe = []
@@ -58,8 +132,8 @@ def FIS(cfg, model, dataloaders, max_repeat, bos=False):
 
             _bboxes = torch.Tensor(_bboxes)
             _bboxes_perturbe = torch.Tensor(_bboxes_perturbe)
-            _logits = torch.Tensor(_logits)
-            _logits_perturbe = torch.Tensor(_logits_perturbe)
+            _logits = torch.Tensor([l.reshape((1,)) for l in _logits])
+            _logits_perturbe = torch.Tensor([l.reshape((1,)) for l in _logits_perturbe])
 
             if len(_bboxes.shape) < 2 or len(_bboxes_perturbe.shape) < 2:
                 continue
@@ -86,6 +160,7 @@ def FIS(cfg, model, dataloaders, max_repeat, bos=False):
     return {"score": scores_perModel,
             "ground_truth": round(ground_truth, 4),}
 
+
 def PDR(cfg, model, dataloaders, max_repeat):
     USE_BACKBONE_FEATURE = True
     SEMISUPNET_DIS_TYPE = ["p2","p3","p4","p5"] #todo: review which features should be used.
@@ -103,6 +178,7 @@ def PDR(cfg, model, dataloaders, max_repeat):
     
     return {"score": round(dist, 4),}
 
+
 def calCateProtoDistance(source: torch.Tensor, target: torch.Tensor):
     cateNum, featureDim = source.shape
 
@@ -119,6 +195,7 @@ def calCateProtoDistance(source: torch.Tensor, target: torch.Tensor):
     div = round(((dist_crossDomain_diffCate * dist_sourceInDomain_diffCate * dist_targetInDomain_diffCate / dist_crossDomain_sameCate)).cpu().item(), 4)
 
     return div
+
 
 def getPrototypes(model, dataloader, useBackboneFeature=True, featureNames=["vgg4"]):
     prototypes = []
@@ -165,6 +242,7 @@ def getPrototypes(model, dataloader, useBackboneFeature=True, featureNames=["vgg
     normalized_prototype = total_prototype / total_weight.unsqueeze(1)
     return normalized_prototype, backboneFeatureCat
 
+
 def computeKLDivergenceMatrix(logits1: torch.Tensor, logits2: torch.Tensor, eps: float = 1e-8) -> torch.Tensor:
     log_probs1 = logits1.log().unsqueeze(1)
     log_probs2 = logits2.log().unsqueeze(0)
@@ -173,12 +251,14 @@ def computeKLDivergenceMatrix(logits1: torch.Tensor, logits2: torch.Tensor, eps:
 
     return kl_matrix
 
+
 def _fp16_clamp(x, min=None, max=None):
     if not x.is_cuda and x.dtype == torch.float16:
         # clamp for cpu float16, tensor fp16 has no clamp implementation
         return x.float().clamp(min, max).half()
 
     return x.clamp(min, max)
+
 
 def _bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
 
@@ -252,6 +332,7 @@ def _bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
     enclose_area = torch.max(enclose_area, eps)
     gious = ious - (enclose_area - union) / enclose_area
     return gious
+
 
 class IoUCost():
     def __init__(self, iou_mode='iou', weight=1.): 

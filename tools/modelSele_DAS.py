@@ -1,3 +1,4 @@
+import glob
 import detectron2.utils.comm as comm
 from detectron2.checkpoint import DetectionCheckpointer
 from detectron2.config import get_cfg
@@ -87,10 +88,11 @@ def calculateMultiFast(cfg, model_dirs: list, method_functions: list, repeat=1):
     # Build data_loader
     #dataset = DatasetCatalog.get(cfg.DATASETS.TRAIN[0])
     
-    # Based on _test_loader_from_config
-    source_dataset = get_detection_dataset_dicts(cfg.DATASETS.TRAIN, filter_empty=False)
+    # Updated DAS - Replaced DAS dataloading with dataloading based on _test_loader_from_config
+    debug_length = 20
+    source_dataset = get_detection_dataset_dicts(cfg.DATASETS.TRAIN, filter_empty=False)[:debug_length]
     dataloader_source = build_detection_test_loader(source_dataset, mapper=DatasetMapper(cfg, False), sampler=InferenceSampler(len(source_dataset)))
-    test_dataset = get_detection_dataset_dicts(cfg.DATASETS.TEST[0], filter_empty=False)
+    test_dataset = get_detection_dataset_dicts(cfg.DATASETS.TEST[0], filter_empty=False)[:debug_length]
     dataloader_target = build_detection_test_loader(test_dataset, mapper=DatasetMapper(cfg, False), sampler=InferenceSampler(len(test_dataset)))    
     
     """
@@ -131,6 +133,8 @@ def calculateMultiFast(cfg, model_dirs: list, method_functions: list, repeat=1):
         for method_function in method_functions:
             # 1 model construction
             model = build_model(cfg)
+            model.eval()
+            model.training = False
             #model_teacher = Trainer.build_model(cfg)
             #ensem_ts_model = EnsembleTSModel(model_teacher, model)  # whole model with teacher and student.
 
@@ -138,11 +142,10 @@ def calculateMultiFast(cfg, model_dirs: list, method_functions: list, repeat=1):
             #DetectionCheckpointer(
             #    ensem_ts_model, save_dir=cfg.OUTPUT_DIR
             #).resume_or_load(model_dir, resume=args.resume)
-            load_model_weights(model_dir, model) #todo: confirm it's loading the teahcer model
+            load_model_weights(model_dir, model) # Loads Teacher (EMA) model if it's present.
 
             result_dict = method_function(cfg, 
-                                          #ensem_ts_model.modelTeacher,
-                                          model,
+                                          model, #ensem_ts_model.modelTeacher,
                                           [dataloader_source, dataloader_target],
                                           repeat)
             
@@ -176,12 +179,12 @@ def main(args):
     #assert args.eval_only, "Only eval-only mode supported."
     #assert cfg.SEMISUPNET.Trainer == "ateacher"
 
-    model_dir = "/home/heather/GitHub/aldi/outputs/sim10k/sim10k_baseline_strongaug_ema"
-    model_names = [f"model_{str(i).zfill(7)}.pth" for i in range(99, 399, 100)]
-
-    model_dirs = [os.path.join(model_dir, model_name) for model_name in model_names]
+    #model_dir = "/home/heather/GitHub/aldi/outputs/sim10k/sim10k_baseline_strongaug_ema"
+    model_dirs = sorted(glob.glob(os.path.join(cfg.OUTPUT_DIR, 'model_0*99.pth')))    
+    result = calculateMultiFast(cfg, model_dirs, [FIS, PDR])
+    print(result)
     
-    result = calculateMultiFast(cfg, model_dirs, [PDR])
+    #todo: store data in useful format
 
     return None
 
