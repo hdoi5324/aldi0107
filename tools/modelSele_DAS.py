@@ -91,9 +91,9 @@ def calculateMultiFast(cfg, model_dirs: list, method_functions: list, repeat=1):
     
     # Updated DAS - Replaced DAS dataloading with dataloading based on _test_loader_from_config
     debug_length = 20
-    source_dataset = get_detection_dataset_dicts(cfg.DATASETS.TRAIN, filter_empty=False)[:debug_length]
+    source_dataset = get_detection_dataset_dicts(cfg.DATASETS.TRAIN, filter_empty=False)#[:debug_length]
     dataloader_source = build_detection_test_loader(source_dataset, mapper=DatasetMapper(cfg, False), sampler=InferenceSampler(len(source_dataset)))
-    test_dataset = get_detection_dataset_dicts(cfg.DATASETS.TEST[0], filter_empty=False)[:debug_length]
+    test_dataset = get_detection_dataset_dicts(cfg.DATASETS.TEST[0], filter_empty=False)#[:debug_length]
     dataloader_target = build_detection_test_loader(test_dataset, mapper=DatasetMapper(cfg, False), sampler=InferenceSampler(len(test_dataset)))    
     
     """
