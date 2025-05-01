@@ -17,7 +17,7 @@ def main():
     #    split_file(f, COCO(f))
 
     combined_dataset = combine_coco(coco_files)
-    new_combined_file = "/home/heather/GitHub/aldi0107/datasets/collated_outputs/synthetic_urchin/annotations/instances_test2017.json"
+    new_combined_file = "/datasets/collated_outputs/synthetic_urchin/annotations/instances_test2017.json"
     with open(new_combined_file, "w") as fp:
         json.dump(combined_dataset, fp)
     print(f"Saved {new_combined_file}")

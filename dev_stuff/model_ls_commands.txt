@@ -1,0 +1,2 @@
+cd Github/aldi
+ls outputs/*/*/*99.pth outputs/*/*/config.yaml
