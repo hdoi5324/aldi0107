@@ -133,3 +133,6 @@ def add_aldi_config(cfg):
     _C.MODEL_SELECTION.DROPOUT = 0.1
     _C.MODEL_SELECTION.SAMPLE = 250
     
+    # In later Detectron2
+    _C.DATALOADER.REPEAT_SQRT = True 
+    _C.FLOAT32_PRECISION = ''
