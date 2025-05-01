@@ -1,90 +1,18 @@
-import os
-import numpy as np
-
-#from adapteacher.engine.trainer import ATeacherTrainer
-
-from detectron2.evaluation import inference_on_dataset
-from detectron2.evaluation import DatasetEvaluators
-from aldi.evaluation import Detectron2COCOEvaluatorAdapter
-
-from modelSeleTools_DAS.fast_rcnn import fast_rcnn_inference_single_image_all_scores
-
-
+from adapteacher.engine.trainer import ATeacherTrainer
 from scipy.optimize import linear_sum_assignment
 import copy
 import torch
 import torch.nn.functional as F
 
-
-def perturb_model_parameters(module):
-    # Based on DAS.  rcnn.py in DAobjTwoStagePseudoLabGeneralizedRCNN.inference method.
-    # Applies perturbation to model rather than in the model class.
-    
-    # todo: check this works!
-    if not hasattr(module, 'original_params'):
-        module.original_params = None
-    if module.original_params is None: # Perturb model once
-        ignoreNames = "D_img"
-
-        stds = []
-        print("saving original parameters...")
-        module.original_params = {}
-        for name, param in module.named_parameters():
-            if ignoreNames in name:
-                continue
-            module.original_params[name] = param.clone()
-            std = param.std().item()
-            stds.append(std) if not np.isnan(std) else ...
-        # print(np.mean(stds))
-        step = 1 # * np.exp(np.mean(std))
-        print("step is setted to {}".format(step))
-
-        n_params = sum([
-            p.numel() for n, p in module.named_parameters() if not ignoreNames in n
-        ])
-        random_vector = torch.rand(n_params)
-        direction = (random_vector / torch.norm(random_vector)).cuda() * step
-
-        offset = 0
-        for n, p in module.named_parameters():
-            if ignoreNames in n:
-                continue
-            size = p.numel()
-            ip = direction[offset:offset+size].view(p.shape)
-            p.data = module.original_params[n] + ip
-            offset += size
-        print("Finished perturbing.")
-    return module
-
-def build_DAS_evaluator(cfg, dataset_name, output_folder=None):
-    """Just do COCO Evaluation."""
-    if output_folder is None:
-        output_folder = os.path.join(cfg.OUTPUT_DIR, "DAS")
-    evaluator = DatasetEvaluators([Detectron2COCOEvaluatorAdapter(dataset_name, output_dir=output_folder)])
-    return evaluator
-
-
-def FIS(cfg, model, dataloaders, max_repeat):
-    from detectron2.modeling.roi_heads import fast_rcnn 
-    fast_rcnn.fast_rcnn_inference_single_image = fast_rcnn_inference_single_image_all_scores    
-    
-    #evaluator = ATeacherTrainer.build_evaluator(cfg, cfg.DATASETS.TEST[0])
+def FIS(cfg, model, dataloaders, max_repeat, bos=False):
+    evaluator = ATeacherTrainer.build_evaluator(cfg, cfg.DATASETS.TEST[0])
     dataloader = dataloaders[1]
-    evaluator = build_DAS_evaluator(cfg, dataset_name=cfg.DATASETS.TEST[0])
     torch.set_grad_enabled(False)
 
-    #res, preds_gallery = ATeacherTrainer.test(cfg, model, evaluators=[evaluator],
-    #                                          data_loader=dataloader, perturb=False)
-    #data_loader = ALDITrainer.build_test_loader(cfg, dataset)
-    
-    # Updated DAS - use forward hook to get preds_gallery
-    preds_gallery = []
-    forward_hook_handle = model.register_forward_hook(lambda module, input, output: preds_gallery.append(output))
-    res = inference_on_dataset(model, dataloader, evaluator=evaluator)
-    forward_hook_handle.remove()
+    res, preds_gallery = ATeacherTrainer.test(cfg, model, evaluators=[evaluator],
+                                              data_loader=dataloader, perturb=False)
 
     reg_list = [x[0]["instances"].get("pred_boxes").tensor for x in preds_gallery]
-    #todo: should "scores" have logits applied.
     logits = [x[0]["instances"].get("scores_logits") for x in preds_gallery]    # Notion: Softmax before returning.
 
     results_bbox_per_img = []
@@ -104,18 +32,8 @@ def FIS(cfg, model, dataloaders, max_repeat):
         _lambda = lambdas[repeat_time]
         print("\nrepeat time: {}".format(repeat_time))
         model_copied = copy.deepcopy(model)
-        # Updated DAS - apply perturbation to model rather than in model code
-        model_copied = perturb_model_parameters(model_copied)
-
-        #_, preds_gallery_perturb = ATeacherTrainer.test(cfg, model_copied, evaluators=[evaluator], 
-        #                                                data_loader=dataloader, perturb=True)
-        
-        # Updated DAS - use forward hook for preds_gallery_perturb and perturb model prior
-        preds_gallery_perturb = []        
-        forward_hook_handle = model_copied.register_forward_hook(lambda module, input, output: preds_gallery_perturb.append(output))
-        _ = inference_on_dataset(model_copied, dataloader, evaluator=evaluator)
-        forward_hook_handle.remove()
-
+        _, preds_gallery_perturb = ATeacherTrainer.test(cfg, model_copied, evaluators=[evaluator], 
+                                                        data_loader=dataloader, perturb=True)
         reg_list_perturbe = [x[0]["instances"].get("pred_boxes").tensor for x in preds_gallery_perturb]
         logits_perturbe = [x[0]["instances"].get("scores_logits") for x in preds_gallery_perturb]
 
@@ -168,24 +86,21 @@ def FIS(cfg, model, dataloaders, max_repeat):
     return {"score": scores_perModel,
             "ground_truth": round(ground_truth, 4),}
 
-
 def PDR(cfg, model, dataloaders, max_repeat):
     USE_BACKBONE_FEATURE = True
-    SEMISUPNET_DIS_TYPE = ["p2","p3","p4","p5"] #todo: review which features should be used.
     assert len(dataloaders) == 2
     torch.set_grad_enabled(False)
     model.eval()
 
     dataloader_source, dataloader_target = dataloaders
     proto_target, _ = getPrototypes(model, dataloader_target,
-                                                         USE_BACKBONE_FEATURE, SEMISUPNET_DIS_TYPE)
+                                                         USE_BACKBONE_FEATURE, [cfg.SEMISUPNET.DIS_TYPE])
     proto_source, _ = getPrototypes(model, dataloader_source,
-                                                         USE_BACKBONE_FEATURE, SEMISUPNET_DIS_TYPE)
+                                                         USE_BACKBONE_FEATURE, [cfg.SEMISUPNET.DIS_TYPE])
     
     dist = calCateProtoDistance(proto_source, proto_target)
     
     return {"score": round(dist, 4),}
-
 
 def calCateProtoDistance(source: torch.Tensor, target: torch.Tensor):
     cateNum, featureDim = source.shape
@@ -204,7 +119,6 @@ def calCateProtoDistance(source: torch.Tensor, target: torch.Tensor):
 
     return div
 
-
 def getPrototypes(model, dataloader, useBackboneFeature=True, featureNames=["vgg4"]):
     prototypes = []
     weights = []
@@ -218,24 +132,13 @@ def getPrototypes(model, dataloader, useBackboneFeature=True, featureNames=["vgg
         features = model.backbone(images.tensor)
         proposals, _ = model.proposal_generator(images, features, None)
 
-        # results, _ = self.roi_heads(images, features, proposals, None)
-        # In roi_heads.forward =>   
-        # 
-        #   pred_instances = self._forward_box(features, proposals)
-        # In roi_heads._forward_box
-        #         features = [features[f] for f in self.box_in_features]
-        #         box_features = self.box_pooler(features, [x.proposal_boxes for x in proposals])
-        #         box_features = self.box_head(box_features)
-        #         predictions = self.box_predictor(box_features)
-        features = [features[f] for f in featureNames] #todo: could do this without feature names.  Just take all the features returned.
-        backboneFeatureList.append(torch.mean(features[0], dim=(2,3))) # Takes first feature name only. Not used later.
+        features = [features[f] for f in featureNames]
+        backboneFeatureList.append(torch.mean(features[0], dim=(2,3)))
 
         box_features_backbone = model.roi_heads.box_pooler(features, [x.proposal_boxes for x in proposals])  # [1000, 512, 7, 7]
         box_features_mlp = model.roi_heads.box_head(box_features_backbone)  # [1000, 1024]
 
-        #todo: this needs to be fixed. Predictions is actual two returns including logits for all classes
-        predictions = model.roi_heads.box_predictor(box_features_mlp) # FastRCNNOutputLayers.forward
-        # self.box_predictor.inference(predictions, proposals)
+        predictions = model.roi_heads.box_predictor(box_features_mlp)
         category_predictions = F.softmax(predictions[0], dim=1)
 
         if useBackboneFeature:
@@ -261,7 +164,6 @@ def getPrototypes(model, dataloader, useBackboneFeature=True, featureNames=["vgg
     normalized_prototype = total_prototype / total_weight.unsqueeze(1)
     return normalized_prototype, backboneFeatureCat
 
-
 def computeKLDivergenceMatrix(logits1: torch.Tensor, logits2: torch.Tensor, eps: float = 1e-8) -> torch.Tensor:
     log_probs1 = logits1.log().unsqueeze(1)
     log_probs2 = logits2.log().unsqueeze(0)
@@ -270,14 +172,12 @@ def computeKLDivergenceMatrix(logits1: torch.Tensor, logits2: torch.Tensor, eps:
 
     return kl_matrix
 
-
 def _fp16_clamp(x, min=None, max=None):
     if not x.is_cuda and x.dtype == torch.float16:
         # clamp for cpu float16, tensor fp16 has no clamp implementation
         return x.float().clamp(min, max).half()
 
     return x.clamp(min, max)
-
 
 def _bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
 
@@ -351,7 +251,6 @@ def _bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
     enclose_area = torch.max(enclose_area, eps)
     gious = ious - (enclose_area - union) / enclose_area
     return gious
-
 
 class IoUCost():
     def __init__(self, iou_mode='iou', weight=1.): 

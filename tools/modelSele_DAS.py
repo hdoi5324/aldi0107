@@ -1,5 +1,7 @@
 import glob
 import json
+import pprint
+
 import detectron2.utils.comm as comm
 from detectron2.checkpoint import DetectionCheckpointer
 from detectron2.config import get_cfg
@@ -90,7 +92,7 @@ def calculateMultiFast(cfg, model_dirs: list, method_functions: list, repeat=1):
     #dataset = DatasetCatalog.get(cfg.DATASETS.TRAIN[0])
     
     # Updated DAS - Replaced DAS dataloading with dataloading based on _test_loader_from_config
-    debug_length = 20
+    debug_length = 500
     source_dataset = get_detection_dataset_dicts(cfg.DATASETS.TRAIN, filter_empty=False)#[:debug_length]
     dataloader_source = build_detection_test_loader(source_dataset, mapper=DatasetMapper(cfg, False), sampler=InferenceSampler(len(source_dataset)))
     test_dataset = get_detection_dataset_dicts(cfg.DATASETS.TEST[0], filter_empty=False)#[:debug_length]
@@ -130,7 +132,7 @@ def calculateMultiFast(cfg, model_dirs: list, method_functions: list, repeat=1):
         METHODS_DICT[method_function.__name__] = []
     
     all_results = {}
-    for model_dir in model_dirs:
+    for model_dir in model_dirs: 
         # [MAIN]
         all_results[os.path.basename(model_dir)] = {}
         for method_function in method_functions:
@@ -188,25 +190,39 @@ def main(args):
 
     model_dirs = sorted(glob.glob(os.path.join(cfg.OUTPUT_DIR, 'model_0*99.pth')))    
     result, all_result_dict = calculateMultiFast(cfg, model_dirs, [FIS, PDR])
-    print(result)
 
-    #todo: Add DAS calculation.  Normalise FIS, PDR across all models then add.
-    # iterate through methods
-    # get all method scores and normalise
-    # Sum
+    # DAS - normalize measures and calculate DAS (sum of FIS and PDR)
+    def normalize(array):
+        normalized_array = (array - np.min(array)) / (np.max(array) - np.min(array))
+        return normalized_array.tolist()
+    
+    model_keys = [k for k in list(all_result_dict.keys()) if "model_" in k]
+    for measure in ['PDR', 'FIS']:
+        measures = [all_result_dict[mk][measure] for mk in model_keys]
+        print(measure, measures)
+        if measure == 'FIS':
+            measures = [f[str(1)][0]*-1 for f in measures]
+        normalized_measures = normalize(np.array(measures))
+        for i, mk in enumerate(model_keys):
+            all_result_dict[mk][f"{measure}_normalized"] = normalized_measures[i]
+    for mk in model_keys:
+        all_result_dict[mk]["DAS"] = all_result_dict[mk]["FIS_normalized"] + all_result_dict[mk]["PDR"]
     
     # Save outputs to file
     all_result_dict['output_dir'] = cfg.OUTPUT_DIR
     all_result_dict['target_dataset'] = cfg.DATASETS.TEST[0]
     all_result_dict['source_dataset'] = cfg.DATASETS.TRAIN
     all_result_dict['config_file'] = args.config_file
+    pprint.pformat(all_result_dict)
+    
+    # Save results dictionary
     with open(os.path.join(cfg.OUTPUT_DIR, 'DAS_outputs.json'), 'w') as file:
         json.dump(all_result_dict, file)
         
-    with open(os.path.join(cfg.OUTPUT_DIR, 'DAS_outputs.json'), 'r') as file:
-        data = json.load(file)
+    #with open(os.path.join(cfg.OUTPUT_DIR, 'DAS_outputs.json'), 'r') as file:
+    #    data = json.load(file)
     
-    return data
+    return all_result_dict
 
 
 if __name__ == "__main__":

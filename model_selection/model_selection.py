@@ -1,7 +1,6 @@
 import sys
 import datetime
 import json
-import pprint
 import logging
 import os
 import pprint
