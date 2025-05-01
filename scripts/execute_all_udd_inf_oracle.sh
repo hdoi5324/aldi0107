@@ -1,0 +1,11 @@
+#!/bin/bash
+
+#CUDA_VISIBLE_DEVICES=0,1 python tools/train_net.py --num-gpus 2 --config-file configs/urchininf/OracleT-RCNN-FPN-urchininf_strongaug_ema.yaml OUTPUT_DIR \'outputs/urchininf/oracle_strongaug_ema_udd25/\' LOGGING.GROUP_TAGS 25UDD,T5 DATASETS.TRAIN \(\'UDD_train_split_25\',\)
+CUDA_VISIBLE_DEVICES=0,1 python tools/train_net.py --num-gpus 2 --config-file configs/urchininf/OracleT-RCNN-FPN-urchininf_strongaug_ema.yaml OUTPUT_DIR \'outputs/urchininf/oracle_strongaug_ema_udd50/\' LOGGING.GROUP_TAGS 50UDD,T5 DATASETS.TRAIN \(\'UDD_train_split_50\',\)
+CUDA_VISIBLE_DEVICES=0,1 python tools/train_net.py --num-gpus 2 --config-file configs/urchininf/OracleT-RCNN-FPN-urchininf_strongaug_ema.yaml OUTPUT_DIR \'outputs/urchininf/oracle_strongaug_ema_udd100/\' LOGGING.GROUP_TAGS 100UDD,T5 DATASETS.TRAIN \(\'UDD_train_split_100\',\)
+CUDA_VISIBLE_DEVICES=0,1 python tools/train_net.py --num-gpus 2 --config-file configs/urchininf/OracleT-RCNN-FPN-urchininf_strongaug_ema.yaml OUTPUT_DIR \'outputs/urchininf/oracle_strongaug_ema_udd200/\' LOGGING.GROUP_TAGS 200UDD,T5 DATASETS.TRAIN \(\'UDD_train_split_200\',\)
+CUDA_VISIBLE_DEVICES=0,1 python tools/train_net.py --num-gpus 2 --config-file configs/urchininf/OracleT-RCNN-FPN-urchininf_strongaug_ema.yaml OUTPUT_DIR \'outputs/urchininf/oracle_strongaug_ema_udd400/\' LOGGING.GROUP_TAGS 400UDD,T5 DATASETS.TRAIN \(\'UDD_train_split_400\',\)
+CUDA_VISIBLE_DEVICES=0,1 python tools/train_net.py --num-gpus 2 --config-file configs/urchininf/OracleT-RCNN-FPN-urchininf_strongaug_ema.yaml OUTPUT_DIR \'outputs/urchininf/oracle_strongaug_ema_udd600/\' LOGGING.GROUP_TAGS 600UDD,T5 DATASETS.TRAIN \(\'UDD_train_split_600\',\)
+CUDA_VISIBLE_DEVICES=0,1 python tools/train_net.py --num-gpus 2 --config-file configs/urchininf/OracleT-RCNN-FPN-urchininf_strongaug_ema.yaml OUTPUT_DIR \'outputs/urchininf/oracle_strongaug_ema_udd1000/\' LOGGING.GROUP_TAGS 1000UDD,T5 DATASETS.TRAIN \(\'UDD_train_split_1000\',\)
+CUDA_VISIBLE_DEVICES=0,1 python tools/train_net.py --num-gpus 2 --config-file configs/urchininf/OracleT-RCNN-FPN-urchininf_strongaug_ema.yaml OUTPUT_DIR \'outputs/urchininf/oracle_strongaug_ema_udd1400/\' LOGGING.GROUP_TAGS 1400UDD,T5 DATASETS.TRAIN \(\'UDD_train_split_1400\',\)
+
