@@ -25,6 +25,8 @@ outputs/cityscapes/cityscapes_baseline_strongaug_ema/model_0020999.pth
 outputs/cityscapes/cityscapes_baseline_strongaug_ema/model_0023999.pth
 outputs/cityscapes/cityscapes_baseline_strongaug_ema/model_0026999.pth
 outputs/cityscapes/cityscapes_baseline_strongaug_ema/model_0029999.pth
+outputs/imosauv/imosauv_ALDI_last/config.yaml
+outputs/imosauv/imosauv_baseline_strongaug_ema/config.yaml
 outputs/sim10k/sim10k_ALDI_last/config.yaml
 outputs/sim10k/sim10k_ALDI_last/model_0002999.pth
 outputs/sim10k/sim10k_ALDI_last/model_0005999.pth
@@ -33,6 +35,12 @@ outputs/sim10k/sim10k_ALDI_last/model_0011999.pth
 outputs/sim10k/sim10k_ALDI_last/model_0014999.pth
 outputs/sim10k/sim10k_ALDI_last/model_0017999.pth
 outputs/sim10k/sim10k_ALDI_last/model_0020999.pth
+outputs/sim10k/sim10k_ALDI_last/model_0023999.pth
+outputs/sim10k/sim10k_ALDI_last/model_0026999.pth
+outputs/sim10k/sim10k_ALDI_last/model_0029999.pth
+outputs/sim10k/sim10k_ALDI_last/model_0032999.pth
+outputs/sim10k/sim10k_ALDI_last/model_0035999.pth
+outputs/sim10k/sim10k_ALDI_last/model_0038999.pth
 outputs/sim10k/sim10k_baseline_strongaug_ema/config.yaml
 outputs/sim10k/sim10k_baseline_strongaug_ema/model_0000999.pth
 outputs/sim10k/sim10k_baseline_strongaug_ema/model_0001999.pth
@@ -43,3 +51,5 @@ outputs/sim10k/sim10k_baseline_strongaug_ema/model_0005999.pth
 outputs/sim10k/sim10k_baseline_strongaug_ema/model_0006999.pth
 outputs/sim10k/sim10k_baseline_strongaug_ema/model_0007999.pth
 outputs/sim10k/sim10k_baseline_strongaug_ema/model_0008999.pth
+outputs/urchininf/urchininf_ALDI_last/config.yaml
+outputs/urchininf/urchininf_baseline_strongaug_ema/config.yaml

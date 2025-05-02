@@ -190,7 +190,15 @@ def main(args):
 
     model_dirs = sorted(glob.glob(os.path.join(cfg.OUTPUT_DIR, 'model_0*99.pth')))    
     result, all_result_dict = calculateMultiFast(cfg, model_dirs, [FIS, PDR])
-
+    
+    # Save results dictionary
+    all_result_dict['output_dir'] = cfg.OUTPUT_DIR
+    all_result_dict['target_dataset'] = cfg.DATASETS.TEST[0]
+    all_result_dict['source_dataset'] = cfg.DATASETS.TRAIN
+    all_result_dict['config_file'] = args.config_file    
+    with open(os.path.join(cfg.OUTPUT_DIR, 'DAS_outputs.json'), 'w') as file:
+        json.dump(all_result_dict, file)
+        
     # DAS - normalize measures and calculate DAS (sum of FIS and PDR)
     def normalize(array):
         normalized_array = (array - np.min(array)) / (np.max(array) - np.min(array))
@@ -201,7 +209,7 @@ def main(args):
         measures = [all_result_dict[mk][measure] for mk in model_keys]
         print(measure, measures)
         if measure == 'FIS':
-            measures = [f[str(1)][0]*-1 for f in measures]
+            measures = [f[1][0]*-1 for f in measures]
         normalized_measures = normalize(np.array(measures))
         for i, mk in enumerate(model_keys):
             all_result_dict[mk][f"{measure}_normalized"] = normalized_measures[i]
@@ -209,13 +217,7 @@ def main(args):
         all_result_dict[mk]["DAS"] = all_result_dict[mk]["FIS_normalized"] + all_result_dict[mk]["PDR"]
     
     # Save outputs to file
-    all_result_dict['output_dir'] = cfg.OUTPUT_DIR
-    all_result_dict['target_dataset'] = cfg.DATASETS.TEST[0]
-    all_result_dict['source_dataset'] = cfg.DATASETS.TRAIN
-    all_result_dict['config_file'] = args.config_file
     pprint.pformat(all_result_dict)
-    
-    # Save results dictionary
     with open(os.path.join(cfg.OUTPUT_DIR, 'DAS_outputs.json'), 'w') as file:
         json.dump(all_result_dict, file)
         
