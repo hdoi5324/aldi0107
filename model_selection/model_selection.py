@@ -26,7 +26,7 @@ from detectron2.evaluation import DatasetEvaluators
 from detectron2.modeling import build_model
 from detectron2.utils.logger import log_every_n_seconds, _log_api_usage
 from fvcore.nn.giou_loss import giou_loss
-from utils import load_model_weights
+from model_selection.utils import load_model_weights
 
 from detectron2.utils.events import EventStorage, get_event_storage
 from detectron2.structures import pairwise_iou, Boxes, BoxMode
@@ -48,7 +48,7 @@ logger = logging.getLogger("detectron2")
 
 
 class ModelSelection:
-    def __init__(self, cfg, source_ds, target_ds=None, n_samples=250, dropout=0.1, n_perturbations=3, gather_metric_period=1, transformed_src=3):
+    def __init__(self, cfg, source_ds, target_ds=None, n_samples=250, dropout=0.1, n_perturbations=3, gather_metric_period=1, transformed_src=0):
         self._hooks: List[HookBase] = []
         self.iter: int = 0
         self.start_iter: int = 0

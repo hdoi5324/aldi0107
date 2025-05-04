@@ -56,7 +56,7 @@ def perturb_model_parameters(module):
         print("Finished perturbing.")
     return module
 
-def build_DAS_evaluator(cfg, dataset_name, output_folder=None):
+def build_evaluator(cfg, dataset_name, output_folder=None):
     """Just do COCO Evaluation."""
     if output_folder is None:
         output_folder = os.path.join(cfg.OUTPUT_DIR, "DAS")
@@ -70,7 +70,7 @@ def FIS(cfg, model, dataloaders, max_repeat):
     
     #evaluator = ATeacherTrainer.build_evaluator(cfg, cfg.DATASETS.TEST[0])
     dataloader = dataloaders[1]
-    evaluator = build_DAS_evaluator(cfg, dataset_name=cfg.DATASETS.TEST[0])
+    evaluator = build_evaluator(cfg, dataset_name=cfg.DATASETS.TEST[0])
     torch.set_grad_enabled(False)
 
     #res, preds_gallery = ATeacherTrainer.test(cfg, model, evaluators=[evaluator],

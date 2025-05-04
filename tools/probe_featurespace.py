@@ -128,7 +128,7 @@ def od_ice(model, data_loader, evaluator, lam=0.55, repeat=1):
                     'diff_ice': diff_ice,
                     'eval': evaluation['bbox']['AP50'],
                     'evaluation': evaluation,}
-    print(f"Same / Diff ICE {pprint.pprint(results_dict)}")
+    print(f"Same / Diff ICE {pprint.pformat(results_dict)}")
 
     return results_dict, image_level_features, proposal_level_features
 
@@ -379,7 +379,7 @@ def main(args, n=10, lam=0.55, repeat=3):
 
     outputs = mixVal(outputs) # Add combined ice ranking
     measure_keys = list(next(iter(outputs.values())))
-    pprint.pprint(outputs)
+    pprint.pp(outputs)
     
     model_df = get_model_df(outputs)
     print(model_df.to_string(index=True))

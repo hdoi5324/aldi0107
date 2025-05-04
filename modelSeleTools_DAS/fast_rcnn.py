@@ -42,9 +42,9 @@ def fast_rcnn_inference_single_image_all_scores(
     if not valid_mask.all():
         boxes = boxes[valid_mask]
         scores = scores[valid_mask]
-
-    scores = scores[:, :-1]
+        
     scores_logits = scores.clone().detach()
+    scores = scores[:, :-1]
     
     num_bbox_reg_classes = boxes.shape[1] // 4
     # Convert to Boxes to use the `clip` function ...
@@ -70,14 +70,13 @@ def fast_rcnn_inference_single_image_all_scores(
         keep = keep[:topk_per_image]
     boxes, scores, filter_inds = boxes[keep], scores[keep], filter_inds[keep]
     
-    scores_logits = scores_logits[filter_inds[:, 0]]
-    # (torch.argmax(scores_logits, axis=1) != filter_inds[:, 1]).nonzero()
-    scores_logits = F.softmax(scores_logits, dim=1)
     
     result = Instances(image_shape)
     result.pred_boxes = Boxes(boxes)
     result.scores = scores
     result.pred_classes = filter_inds[:, 1]
+    
+    scores_logits = scores_logits[filter_inds[:, 0]]
     result.scores_logits = scores_logits
 
     return result, filter_inds[:, 0]

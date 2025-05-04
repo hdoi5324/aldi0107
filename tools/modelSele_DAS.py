@@ -4,7 +4,6 @@ import pprint
 
 import detectron2.utils.comm as comm
 from detectron2.checkpoint import DetectionCheckpointer
-from detectron2.config import get_cfg
 from detectron2.engine import default_argument_parser, default_setup, launch
 from detectron2.data import DatasetCatalog, MetadataCatalog
 from detectron2.modeling import build_model
@@ -12,8 +11,7 @@ from detectron2.data.build import get_detection_dataset_dicts, build_detection_t
 from detectron2.data.samplers import InferenceSampler
 
 #from adapteacher import add_ateacher_config
-from aldi.config import add_aldi_config
-from aldi.config_aldi_only import add_aldi_only_config
+
 import aldi.datasets # register datasets with Detectron2
 import aldi.model # register ALDI R-CNN model with Detectron2
 import aldi.backbone # register ViT FPN backbone with Detectron2
@@ -35,6 +33,7 @@ from PIL import Image
 import sys, os
 import time
 from modelSeleTools_DAS.methodsDirectory2Fast import *
+from modelSeleTools_DAS.utils import setup
 
 
 def get_voc_2012_test_images(dirname):
@@ -58,22 +57,7 @@ def get_voc_2012_test_images(dirname):
 DatasetCatalog.register("voc_2012_test_images", lambda: get_voc_2012_test_images("./datasets/VOC2012/"))
 MetadataCatalog.get("voc_2012_test_images").set(thing_classes=[])
 
-def setup(args):
-    """
-    Copied from detectron2/tools/train_net.py
-    """
-    cfg = get_cfg()
 
-    ## Change here
-    add_aldi_config(cfg)
-    add_aldi_only_config(cfg)  # adds a couple of keys as configs have diverged.
-    ## End change
-
-    cfg.merge_from_file(args.config_file)
-    cfg.merge_from_list(args.opts)
-    cfg.freeze()
-    default_setup(cfg, args)
-    return cfg
 
 def calculateMultiFast(cfg, model_dirs: list, method_functions: list, repeat=1):
     #if cfg.SEMISUPNET.Trainer == 'ateacher':
@@ -214,10 +198,10 @@ def main(args):
         for i, mk in enumerate(model_keys):
             all_result_dict[mk][f"{measure}_normalized"] = normalized_measures[i]
     for mk in model_keys:
-        all_result_dict[mk]["DAS"] = all_result_dict[mk]["FIS_normalized"] + all_result_dict[mk]["PDR"]
+        all_result_dict[mk]["DAS"] = all_result_dict[mk]["FIS_normalized"] + all_result_dict[mk]["PDR_normalized"]
     
     # Save outputs to file
-    pprint.pformat(all_result_dict)
+    pprint.pp(all_result_dict)
     with open(os.path.join(cfg.OUTPUT_DIR, 'DAS_outputs.json'), 'w') as file:
         json.dump(all_result_dict, file)
         

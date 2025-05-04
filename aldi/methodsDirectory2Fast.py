@@ -247,7 +247,7 @@ def FIS(model, dataloader, evaluator, max_repeat=1, bos=False):
         results_dict[f"giou_cost_{_lambda}"].append(giou_cost) # GIOU cost used in Faster RCNN
         results_dict[f"same_box_kl_cost_{_lambda}"].append(logit_cost) # kl for logits from same boxes, different models
         
-        print(f"FIS scores: {pprint.pprint(results_dict)}")
+        print(f"FIS scores: {pprint.pformat(results_dict)}")
         del model_copied
 
     return results_dict
