@@ -24,30 +24,17 @@ try:
 except ImportError:
     from neptune.new.utils import stringify_unsupported
     
-from aldi.config import add_aldi_config
+# Keep these so that datasets are loaded
 import aldi.datasets # register datasets with Detectron2
-import aldi.model # register ALDI R-CNN model with Detectron2
-import aldi.backbone # register ViT FPN backbone with Detectron2
+
+#import aldi.model # register ALDI R-CNN model with Detectron2
+#import aldi.backbone # register ViT FPN backbone with Detectron2
+
+from model_selection.utils import setup, save_results_dict, save_outputs
 
 from model_selection.model_selection import ModelSelection, get_dataset_samples
 logger = logging.getLogger("detectron2")
 
-
-def setup(args):
-    """
-    Copied from detectron2/tools/train_net.py
-    """
-    cfg = get_cfg()
-
-    ## Change here
-    add_aldi_config(cfg)
-    ## End change
-
-    cfg.merge_from_file(args.config_file)
-    cfg.merge_from_list(args.opts)
-    cfg.freeze()
-    default_setup(cfg, args)
-    return cfg
 
 def main(args):
     """
@@ -55,11 +42,9 @@ def main(args):
     But replace Trainer with DATrainer and disable TTA.
     """
     cfg = setup(args)
-    selector = ModelSelection(cfg, list(cfg.DATASETS.TRAIN), 
+    selector = ModelSelection(cfg, 
+                              [], #list(cfg.DATASETS.TRAIN), 
                               target_ds=list(cfg.DATASETS.TEST), 
-                              n_samples=cfg.MODEL_SELECTION.SAMPLE, 
-                              dropout=cfg.MODEL_SELECTION.DROPOUT, 
-                              n_perturbations=cfg.MODEL_SELECTION.N_PERTURBATIONS,
                               )
     
     # Get list of model weights - based on matching path
@@ -76,15 +61,17 @@ def main(args):
         
     outputs = OrderedDict()
     for m_idx, model_weights in enumerate(model_paths):
+        outputs[model_weights] = {}
         model_output_src = selector.run_model_selection(model_weights, source=True, neptune_run=run) 
-        outputs[model_weights] = model_output_src
+        outputs[model_weights].update(model_output_src)
         model_output_tgt = selector.run_model_selection(model_weights, source=False, neptune_run=run) 
         outputs[model_weights].update(model_output_tgt)
                     
         # Save outputs in case you want to quit early
         if comm.is_main_process():
-            ModelSelection.save_outputs(outputs, selector.evaluation_dir)
-        
+            _ = save_outputs(outputs, selector.evaluation_dir)
+            _ = save_results_dict(outputs, cfg.OUTPUT_DIR, measure_name="MINE")
+            
     if comm.is_main_process():
         logger.info(f"model_selection: output: {pprint.pformat(outputs)}")
 

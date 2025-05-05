@@ -8,7 +8,7 @@ from detectron2.evaluation import DatasetEvaluators
 from aldi.evaluation import Detectron2COCOEvaluatorAdapter
 
 from modelSeleTools_DAS.fast_rcnn import fast_rcnn_inference_single_image_all_scores
-
+from model_selection.utils import build_evaluator
 
 from scipy.optimize import linear_sum_assignment
 import copy
@@ -56,13 +56,6 @@ def perturb_model_parameters(module):
         print("Finished perturbing.")
     return module
 
-def build_evaluator(cfg, dataset_name, output_folder=None):
-    """Just do COCO Evaluation."""
-    if output_folder is None:
-        output_folder = os.path.join(cfg.OUTPUT_DIR, "DAS")
-    evaluator = DatasetEvaluators([Detectron2COCOEvaluatorAdapter(dataset_name, output_dir=output_folder)])
-    return evaluator
-
 
 def FIS(cfg, model, dataloaders, max_repeat):
     from detectron2.modeling.roi_heads import fast_rcnn 
@@ -70,7 +63,7 @@ def FIS(cfg, model, dataloaders, max_repeat):
     
     #evaluator = ATeacherTrainer.build_evaluator(cfg, cfg.DATASETS.TEST[0])
     dataloader = dataloaders[1]
-    evaluator = build_evaluator(cfg, dataset_name=cfg.DATASETS.TEST[0])
+    evaluator = build_evaluator(cfg, dataset_name=cfg.DATASETS.TEST[0], output_folder=os.path.join(cfg.OUTPUT_DIR, "DAS"))
     torch.set_grad_enabled(False)
 
     #res, preds_gallery = ATeacherTrainer.test(cfg, model, evaluators=[evaluator],

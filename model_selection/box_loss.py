@@ -95,15 +95,17 @@ def classifier_loss_on_gt_boxes(module, inputs):
         del box_features
         
         scores, proposal_deltas = predictions
+        #todo: do same as predict_probs from OutputLayer ie softmax
     
         gt_classes = (
             cat([p.gt_classes for p in targets], dim=0) if len(targets) else torch.empty(0)
         )
         if module.box_predictor.use_sigmoid_ce:
             loss_cls = module.box_predictor.sigmoid_cross_entropy_loss(scores, gt_classes)
+            probs = scores.sigmoid()
         else:
             loss_cls = cross_entropy(scores, gt_classes, reduction="mean")    
-    
-        return loss_cls.detach().to("cpu").numpy()
+            probs = F.softmax(scores, dim=-1)    
+        return loss_cls.detach().to("cpu").numpy(), probs.to("cpu").numpy()
     else:
         return None

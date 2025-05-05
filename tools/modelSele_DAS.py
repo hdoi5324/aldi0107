@@ -33,7 +33,7 @@ from PIL import Image
 import sys, os
 import time
 from modelSeleTools_DAS.methodsDirectory2Fast import *
-from modelSeleTools_DAS.utils import setup
+from model_selection.utils import setup, save_results_dict
 
 
 def get_voc_2012_test_images(dirname):
@@ -201,9 +201,7 @@ def main(args):
         all_result_dict[mk]["DAS"] = all_result_dict[mk]["FIS_normalized"] + all_result_dict[mk]["PDR_normalized"]
     
     # Save outputs to file
-    pprint.pp(all_result_dict)
-    with open(os.path.join(cfg.OUTPUT_DIR, 'DAS_outputs.json'), 'w') as file:
-        json.dump(all_result_dict, file)
+    _ = save_results_dict(all_result_dict, cfg.OUTPUT_DIR, measure_name="DAS")
         
     #with open(os.path.join(cfg.OUTPUT_DIR, 'DAS_outputs.json'), 'r') as file:
     #    data = json.load(file)

@@ -21,19 +21,19 @@ from detectron2.data.build import filter_images_with_only_crowd_annotations, bui
 from detectron2.data.samplers import InferenceSampler
 from detectron2.data.catalog import DatasetCatalog, MetadataCatalog
 from detectron2.data.datasets import load_coco_json, register_coco_instances
+from detectron2.data.dataset_mapper import DatasetMapper
 from detectron2.engine import DefaultTrainer, PeriodicWriter, SimpleTrainer, HookBase, hooks
-from detectron2.evaluation import DatasetEvaluators
 from detectron2.modeling import build_model
 from detectron2.utils.logger import log_every_n_seconds, _log_api_usage
 from fvcore.nn.giou_loss import giou_loss
-from model_selection.utils import load_model_weights
 
 from detectron2.utils.events import EventStorage, get_event_storage
 from detectron2.structures import pairwise_iou, Boxes, BoxMode
 
 from aldi.config import add_aldi_config
-from aldi.evaluation import Detectron2COCOEvaluatorAdapter
 from aldi.methodsDirectory2Fast import perturb_by_dropout, dropout_masks
+
+from model_selection.utils import get_model_shortname, load_model_weights, build_evaluator
 
 # Override box_loss methods to use mean
 from .box_loss import _mean_dense_box_regression_loss, classifier_loss_on_gt_boxes
@@ -42,13 +42,15 @@ setattr(current_module, '_dense_box_regression_loss', _mean_dense_box_regression
 current_module = sys.modules['detectron2.modeling.roi_heads.fast_rcnn']
 setattr(current_module, '_dense_box_regression_loss', _mean_dense_box_regression_loss)
 
+from modelSeleTools_DAS.fast_rcnn import fast_rcnn_inference_single_image_all_scores
+
 DEBUG = False
 debug_dict = {}
 logger = logging.getLogger("detectron2")
 
 
 class ModelSelection:
-    def __init__(self, cfg, source_ds, target_ds=None, n_samples=250, dropout=0.1, n_perturbations=3, gather_metric_period=1, transformed_src=0):
+    def __init__(self, cfg, source_ds=[], target_ds=None, gather_metric_period=1):
         self._hooks: List[HookBase] = []
         self.iter: int = 0
         self.start_iter: int = 0
@@ -63,57 +65,21 @@ class ModelSelection:
         self.model.eval()
 
         # Calculate dropout_masks so they can be used consistently throughout experiments
-        self.perturbation_masks = [dropout_masks(self.model, p=dropout) for _ in range(n_perturbations)]
+        self.perturbation_masks = [dropout_masks(self.model, p=cfg.MODEL_SELECTION.DROPOUT) for _ in range(cfg.MODEL_SELECTION.N_PERTURBATIONS)]
 
-        if transformed_src >0:
+        if cfg.MODEL_SELECTION.N_TRANSFORMED_SOURCE > 0:
             new_source_ds = []
-            for i in range(transformed_src):
+            for i in range(cfg.MODEL_SELECTION.N_TRANSFORMED_SOURCE):
                 new_source_ds += [f"{s_ds}_transformed{i}" for s_ds in source_ds]
             new_source_ds += source_ds
             source_ds = new_source_ds
-        self.sampled_src = get_dataset_samples(source_ds, n=n_samples)[:6]
-        self.sampled_tgt = get_dataset_samples(target_ds, n=1000000) if target_ds is not None else []
+        self.sampled_src = get_dataset_samples(source_ds, n=cfg.MODEL_SELECTION.N_SAMPLE) if source_ds is not None else []
+        #self.sampled_src = self.sampled_src[:min(len(self.sampled_src), 6)]
+        self.sampled_tgt = get_dataset_samples(target_ds, n=1000000) if target_ds is not None else [] # Use all target data
 
         self.evaluation_dir = os.path.join(cfg.OUTPUT_DIR, "model_selection")
         self.gather_metric_period = gather_metric_period
-        
-    def model_shortname(self, model_weights):
-        return os.path.basename(model_weights)[:-4]
-
-
-    @classmethod
-    def build_evaluator(cls, cfg, dataset_name, output_folder=None):
-        """Just do COCO Evaluation."""
-        if output_folder is None:
-            output_folder = os.path.join(cfg.OUTPUT_DIR, "model_selection")
-        evaluator = DatasetEvaluators([Detectron2COCOEvaluatorAdapter(dataset_name, output_dir=output_folder)])
-        # Update evaluator to only check sampled images if it's a sampled dataset
-        if "_sample_" in dataset_name:
-            img_keys = [d['image_id'] for d in DatasetCatalog.get(dataset_name)]
-            evaluator._evaluators[0]._coco_api.imgs = {k: v for k, v in
-                                                       evaluator._evaluators[0]._coco_api.imgs.items() if
-                                                       k in img_keys}
-        return evaluator
-
-
-    @classmethod
-    def save_outputs(cls, outputs, evaluation_dir, filename='model_selection.json'):
-        flat_results = []
-        columns = None
-        for m in outputs:
-            for ds in outputs[m]:
-                if columns is None:
-                    columns = ["model", "dataset"] + list(outputs[m][ds].keys())
-                model_dataset = [m, ds]
-                data = [v for v in outputs[m][ds].values()]
-                flat_results.append(model_dataset + data)
-        df = pd.DataFrame(flat_results, columns=columns)
-        for l in df.columns:
-            if 'loss' in l:
-                df[f"{l}_std"] = df[l].apply(lambda x: x[1])
-                df[l] = df[l].apply(lambda x: x[0])
-        output_file = os.path.join(evaluation_dir, filename)
-        df.to_json(output_file)   
+  
         
     def _write_metrics(
         self,
@@ -134,11 +100,15 @@ class ModelSelection:
                 raise
 
     def run_model_selection(self, model_weights, source=True, neptune_run=None):
+        from detectron2.modeling.roi_heads import fast_rcnn 
+        fast_rcnn.fast_rcnn_inference_single_image = fast_rcnn_inference_single_image_all_scores
+        
         outputs = {}
-        model_shortname = self.model_shortname(model_weights)
+        model_shortname = get_model_shortname(model_weights)
         sampled_datasets = self.sampled_src if source else self.sampled_tgt
         
         total = len(sampled_datasets)
+        eta = 1000000000 # hack to get debug to work.
         info_freq = 5
         start_time = time.perf_counter()
         
@@ -153,15 +123,21 @@ class ModelSelection:
             # og_test_dataset = DatasetCatalog.get(dataset_name)
             
             ### A) Generate Pseudo label for baseline for loss with perturbed model
-            evaluator = ModelSelection.build_evaluator(cfg, dataset_name, self.evaluation_dir)
-            results = DefaultTrainer.test(self.cfg, self.model, evaluator)
+            from detectron2.modeling.roi_heads import fast_rcnn 
+            fast_rcnn.fast_rcnn_inference_single_image = fast_rcnn_inference_single_image_all_scores
+            evaluator = build_evaluator(cfg, dataset_name, self.evaluation_dir, do_eval=True)
+            forward_hook_returns = []
+            forward_hook_handle = self.model.register_forward_hook(lambda module, input, output: forward_hook_returns.append(output))
+            results = DefaultTrainer.test(self.cfg, self.model, evaluator) 
+            forward_hook_handle.remove()
             
-            outputs[unique_dataset_name].update(results['bbox'])  # Assumes bbox results
-            logger.info(f"model_selection: Groundtruth for {dataset_name}, {model_shortname}: {pprint.pformat(results['bbox'])}")
-            if neptune_run is not None:
-                for k, v in results['bbox'].items():
-                    neptune_run[f"metrics/{model_shortname}/{unique_dataset_name}/{k}"] = v
-            del evaluator
+            if 'bbox' in results:
+                outputs[unique_dataset_name].update(results['bbox'])  # Assumes bbox results
+                logger.info(f"model_selection: Groundtruth for {dataset_name}, {model_shortname}: {pprint.pformat(results['bbox'])}")
+                if neptune_run is not None:
+                    for k, v in results['bbox'].items():
+                        neptune_run[f"metrics/{model_shortname}/{unique_dataset_name}/{k}"] = v
+                del evaluator
 
             dataset_file, pseudo_dataset_name = save_pseudo_coco_file(model_weights, self.evaluation_dir, dataset_name,
                                                                       cfg.MODEL_SELECTION.SCORE_THRESHOLD)
@@ -170,27 +146,39 @@ class ModelSelection:
             ### B) Calculate losses with perturbed model against pseudo label coco annotations         
             losses_perturbed = defaultdict(list)
             for n_perturb in range(len(self.perturbation_masks)):
-                # Build data_loader
-                dataset = DatasetCatalog.get(dataset_name)
-                data_loader = build_detection_train_loader(cfg, sampler=InferenceSampler(len(dataset)))
                 # Perturb model with dropout mask
                 model_copied = copy.deepcopy(self.model)
                 model_copied = perturb_by_dropout(model_copied, p=cfg.MODEL_SELECTION.DROPOUT, mask_dict=self.perturbation_masks[n_perturb])
 
-                # B1) Calculate classifier head loss with perturbed model using pseudo gt boxes
-                losses = self.run_dataset(data_loader, model_copied)
+                # B1) Calculate classification loss (classifier head loss) with perturbed model using pseudo gt boxes
+                # Build data_loader from pseudo label dataset
+                dataset = DatasetCatalog.get(pseudo_dataset_name)
+                #data_loader = build_detection_train_loader(cfg, sampler=InferenceSampler(len(dataset))) # todo: need to use pseudo datasets
+                data_loader = build_detection_train_loader(
+                    dataset=dataset[:10],
+                    mapper=DatasetMapper(cfg, True),
+                    sampler=InferenceSampler(10), #(len(dataset)),
+                    total_batch_size=cfg.SOLVER.IMS_PER_BATCH,
+                    aspect_ratio_grouping=cfg.DATALOADER.ASPECT_RATIO_GROUPING,
+                    num_workers=cfg.DATALOADER.NUM_WORKERS)
+                losses = self.run_dataset(data_loader, model_copied) # Will calculate losses with pseudo label boxes
                 for k in losses.keys():
                     losses_perturbed[k].append(losses[k])
                     
                 # B2) Calculate box loss with perturbed model compared to pseudo gt boxes
                 # Generate perturbed boxes by running inference with perturbed model
                 perturbed_evaluation_dir = os.path.join(self.evaluation_dir, 'perturbed')
-                evaluator = ModelSelection.build_evaluator(cfg, dataset_name, perturbed_evaluation_dir)
-                _ = DefaultTrainer.test(self.cfg, model_copied, evaluator)
+                evaluator = build_evaluator(cfg, dataset_name, perturbed_evaluation_dir, do_eval=False)
+                cls_loss_returns = []
+                # todo: pass in pred_instances from psuedo into hook
+                cls_loss_hook_handle = model_copied.roi_heads.register_forward_hook(
+                    lambda module, inputs, outputs: cls_loss_returns.append(classifier_loss_on_gt_boxes(module, inputs)))        
+                _ = DefaultTrainer.test(self.cfg, model_copied, evaluator) # use predicted boxes saved from this evaluation           
+                cls_loss_hook_handle.remove()
                 
                 # Now take the results and compare to pseudo gt boxes
                 box_losses = calc_box_loss(pseudo_dataset_name, perturbed_evaluation_dir)
-                losses_perturbed['loss_box_giou'].append(box_losses[0])
+                losses_perturbed['loss_box_giou'].append(box_losses[0]) # todo: doesn't normalize boxes.  Is this needed??
                 losses_perturbed['loss_box_smooth_l1'].append(box_losses[1])
                 losses_perturbed['loss_box_iou'].append(box_losses[2])
                 
@@ -208,7 +196,7 @@ class ModelSelection:
             total_seconds_per_iter = (time.perf_counter() - start_time) / iters_after_start
             if ds_idx % info_freq == 0 or ds_idx == total - 1:
                 eta = datetime.timedelta(seconds=int(total_seconds_per_iter * (total - ds_idx - 1)))
-                logger.info(f"Model selection for {model_shortname} done {ds_idx + 1}/{total} sampled datasets. Total for {len(self.perturbation_masks)} perturbations: {total_seconds_per_iter:.4f} s/iter. ETA={eta}")
+                logger.info(f"Model selection for {str(model_shortname)} done {ds_idx + 1}/{total} sampled datasets. Total for {cfg.MODEL_SELECTION.N_PERTURBATIONS} perturbations: {total_seconds_per_iter:.4f} s/iter. ETA={eta}")
         return outputs
 
 
@@ -217,12 +205,13 @@ class ModelSelection:
         logger.info("model_selection: Start calculations on dataset")
     
         model.training = True
-        model.train() # put it in train so losses are calculated #todo: might be able to remove this
+        #model.train() # put it in train so losses are calculated #todo: might be able to remove this
         
         # Create hook on model.roi_heads._forward_box(features, proposals)
-        loss_cls_on_gt_boxes = []
+        cls_loss_returns = []
+        # todo: pass in pred_instances from psuedo into hook
         cls_loss_hook_handle = model.roi_heads.register_forward_hook(
-            lambda module, inputs, outputs: loss_cls_on_gt_boxes.append(classifier_loss_on_gt_boxes(module, inputs)))        
+            lambda module, inputs, outputs: cls_loss_returns.append(classifier_loss_on_gt_boxes(module, inputs)))        
         start_iter = 0
         self.iter = start_iter
         self.storage = EventStorage()
@@ -244,7 +233,7 @@ class ModelSelection:
                         total_compute_time = 0    
                     start_compute_time = time.perf_counter()
                     
-                    outputs = self.run_step(inputs, model)
+                    _ = self.run_step(inputs, model)
                     
                     if torch.cuda.is_available():
                         torch.cuda.synchronize()
@@ -265,6 +254,7 @@ class ModelSelection:
                                 f"Total: {total_seconds_per_iter:.4f} s/iter. "
                                 f"ETA={eta}"
                             ),
+                            name="detectron2",
                             n=5,
                         )
                     start_data_time = time.perf_counter()
@@ -272,18 +262,22 @@ class ModelSelection:
             except Exception:
                 logger.exception("Exception during training:")
                 raise
+        loss_cls_on_gt_boxes = [l[0] for l in cls_loss_returns]
+        scores_logits = [l[1] for l in cls_loss_returns]
         cls_loss_hook_handle.remove()
         losses_avg = {k: v._global_avg for k, v in self.storage.histories().items() if 'loss' in k}
         losses_avg['loss_cls_gt_boxes'] = np.mean(np.array(loss_cls_on_gt_boxes))
+        losses_avg['scores_logits'] =scores_logits
         return losses_avg
     
     
     def run_step(self, data, model):
         start = time.perf_counter()
         data_time = time.perf_counter() - start
-        model.training = True
-        model.train() 
-        losses = model(data) # model in training so targets are used
+        model.training = True # so that it calculates losses
+        #model.train() 
+        with torch.no_grad():
+            losses = model(data) # model in training so targets are used
         self._write_metrics(losses, data_time) # Collates loss_dict
 
 
@@ -291,27 +285,31 @@ class ModelSelection:
         # cfg = setup(args)
         cfg.defrost()
         cfg.SEED = cfg.SEED + seed_offset  # update so new random selection
+        
         cfg.DATASETS.TRAIN = (dataset_name,)
+        cfg.DATASETS.TEST = cfg.DATASETS.TRAIN
+        
+        # We're using training to calculate losses but don't want to apply any augmentations.
         cfg.INPUT.MIN_SIZE_TRAIN = 1024
         cfg.INPUT.MAX_SIZE_TRAIN = 1024
-        cfg.INPUT.MIN_SIZE_TEST = 1024
-        cfg.INPUT.MAX_SIZE_TEST = 1024        
+        #cfg.INPUT.MIN_SIZE_TEST = 1024
+        #cfg.INPUT.MAX_SIZE_TEST = 1024        
         cfg.INPUT.RANDOM_FLIP = "none"
-        cfg.DATASETS.TEST = cfg.DATASETS.TRAIN
         cfg.freeze()
         return cfg
 
 
     def update_cfg_loss(self, cfg):
         cfg.defrost()
-        vanilla_cfg = get_cfg()
+        #vanilla_cfg = get_cfg()
         #add_aldi_config(vanilla_cfg)
         #cfg.AUG = vanilla_cfg.AUG
         #cfg.DOMAIN_ADAPT = vanilla_cfg.DOMAIN_ADAPT
         #cfg.EMA = vanilla_cfg.EMA
         cfg.MODEL.RPN.BBOX_REG_LOSS_TYPE = "giou"
         cfg.MODEL.ROI_BOX_HEAD.BBOX_REG_LOSS_TYPE = "giou"
-        cfg.MODEL.ROI_BOX_HEAD.USE_SIGMOID_CE = True
+        cfg.SOLVER.IMS_PER_BATCH = 1
+        #cfg.MODEL.ROI_BOX_HEAD.USE_SIGMOID_CE = True
         #cfg.DATASETS.TEST = (dataset_name,)
         #cfg.DATASETS.TRAIN = (dataset_name,)
         cfg.DATALOADER.FILTER_EMPTY_ANNOTATIONS = False
@@ -399,7 +397,7 @@ def save_pseudo_coco_file(model_weights, results_path, dataset_name, score_thres
 def calc_box_loss(dataset_name, perturbed_results_dir, threshold=0.5):
     # compare results and calc box loss
     logger.info("model_selection: Calculating box loss")
-    dataset_images = DatasetCatalog.get(dataset_name)
+    dataset_images = DatasetCatalog.get(dataset_name) # psuedo dataset
     dataset_metadata = MetadataCatalog.get(dataset_name)
     # unmap the category mapping ids for COCO
     if hasattr(dataset_metadata, "thing_dataset_id_to_contiguous_id"):
@@ -418,21 +416,32 @@ def calc_box_loss(dataset_name, perturbed_results_dir, threshold=0.5):
     coco_results_file = os.path.join(perturbed_results_dir, "coco_instances_results.json")
     with open(coco_results_file, 'r') as file:
         logger.info(f"model_selection: Calculating box loss - Loading results from {coco_results_file}")
-        perturbed_annotations = json.load(file)
+        perturbed_annotations = json.load(file) # perturbed results
     perturbed_ann_by_image = defaultdict(list)
     for ann in perturbed_annotations:
-        if ann['score'] > threshold:
-            ann['category_id'] = dataset_metadata.thing_dataset_id_to_contiguous_id[ann['category_id']]
-            perturbed_ann_by_image[ann['image_id']].append(ann)
+        #if ann['score'] > threshold:
+        ann['category_id'] = dataset_metadata.thing_dataset_id_to_contiguous_id[ann['category_id']]
+        perturbed_ann_by_image[ann['image_id']].append(ann)
     
     #match_quality = 0
     giou_losses, smooth_l1_losses, iou_losses = [], [], []
     no_matches = []
     for instance in dataset_images:
+        scale_x, scale_y = (
+            1 / instance["width"],
+            1 / instance["height"],
+        )
+        scaling = np.array([scale_x, scale_y, scale_x, scale_y])
+        
         perturbed_anns = perturbed_ann_by_image[instance["image_id"]]
         perturbed_boxes = np.array([BoxMode.convert(a["bbox"], BoxMode.XYWH_ABS, BoxMode.XYXY_ABS) for a in perturbed_anns])
+        if len(perturbed_anns) > 0:
+            perturbed_boxes = perturbed_boxes * scaling
         pseudo_anns = instance['annotations']
         pseudo_boxes = np.array([BoxMode.convert(a["bbox"], a["bbox_mode"], BoxMode.XYXY_ABS) for a in pseudo_anns])
+        if len(pseudo_anns) > 0:
+            pseudo_boxes = pseudo_boxes * scaling
+        
         #max_match = min(len(perturbed_anns), len(pseudo_anns))
         # Match boxes using Faster-RCNN matching quality (from detectron2.modelling.proposal_generator.rpn)
         match_quality_matrix = pairwise_iou(Boxes(perturbed_boxes), Boxes(pseudo_boxes)) # gt rows, perturb cols

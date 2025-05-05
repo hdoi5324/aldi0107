@@ -43,16 +43,13 @@ from detectron2.modeling import build_model
 from detectron2.data.build import get_detection_dataset_dicts, build_detection_train_loader, build_detection_test_loader, DatasetMapper
 from detectron2.data.samplers import InferenceSampler
 from detectron2.evaluation import inference_on_dataset
-from modelSeleTools_DAS.fast_rcnn import fast_rcnn_inference_single_image_all_scores
 
+# Keep this so that datasets are loaded
 import aldi.datasets # register datasets with Detectron2
 
-import torch.nn as nn
-
 from modelSeleTools_DAS.fast_rcnn import fast_rcnn_inference_single_image_all_scores
-from model_selection.utils import load_model_weights, perturb_by_dropout
-from modelSeleTools_DAS.utils import setup
-from modelSeleTools_DAS.methodsDirectory2Fast import build_evaluator, perturb_model_parameters
+from model_selection.utils import load_model_weights, perturb_by_dropout,build_evaluator, setup, save_results_dict
+
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -518,7 +515,7 @@ def main(args):
         model.training = False
         load_model_weights(model_dir, model) # Loads Teacher (EMA) model if it's present.
         
-        evaluator = build_evaluator(cfg, dataset_name=cfg.DATASETS.TEST[0])
+        evaluator = build_evaluator(cfg, dataset_name=cfg.DATASETS.TEST[0], output_folder=os.path.join(cfg.OUTPUT_DIR, "BoS"))
         torch.set_grad_enabled(False)
         
         # Updated DAS - use forward hook to get preds_gallery
@@ -696,10 +693,9 @@ def main(args):
     bos_results_dict['output_dir'] = cfg.OUTPUT_DIR
     bos_results_dict['target_dataset'] = cfg.DATASETS.TEST[0]
     bos_results_dict['source_dataset'] = cfg.DATASETS.TRAIN
-    bos_results_dict['config_file'] = args.config_file   
-    with open(os.path.join(cfg.OUTPUT_DIR, 'BoS_outputs.json'), 'w') as file:
-        json.dump(bos_results_dict, file)
-    pprint.pp(bos_results_dict)
+    bos_results_dict['config_file'] = args.config_file
+    
+    _ = save_results_dict(bos_results_dict, cfg.OUTPUT_DIR, measure_name="BoS")
         
     #with open(os.path.join(cfg.OUTPUT_DIR, 'DAS_outputs.json'), 'r') as file:
     #    data = json.load(file)
