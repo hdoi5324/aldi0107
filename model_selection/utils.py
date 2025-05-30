@@ -98,7 +98,8 @@ def dropout_masks(module, p=.1, weights_filter='res4.2.conv3.weight'):
     return mask_dict
 
 
-def perturb_by_dropout(module, p=.1, mask_dict={}, weights_filter='res4.2.conv3.weight'):
+def perturb_by_dropout(module, p=.1, mask_dict={}, n=0, weights_filter='res4.2.conv3.weight', **kwargs):
+    mask_dict = mask_dict[n] if n in mask_dict else {}
     state_dict = module.state_dict()
     last_layer_parameters = [(k, v) for k, v in state_dict.items() if weights_filter in k]
     for (k, w) in last_layer_parameters:

@@ -24,4 +24,4 @@ Homepage = "https://github.com/justinkay/aldi"
 Issues = "https://github.com/justinkay/aldi/issues"
 
 [tool.setuptools.packages.find]
-include = ["aldi", "aldi.*", "model_selection", "model_selection.*", "modelSeleTools_DAS", "modelSeleTools_DAS.*", "BoS", "BoS.*"]
+include = ["modelSeleTools_DAS", "modelSeleTools_DAS.*", "BoS", "BoS.*", "aldi", "aldi.*", "model_selection", "model_selection.*"]
