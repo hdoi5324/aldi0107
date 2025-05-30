@@ -17,7 +17,8 @@ import torch.nn.functional as F
 from torchvision.ops import complete_box_iou_loss
 import detectron2.data.transforms as T
 from detectron2.config import get_cfg
-from detectron2.data.build import filter_images_with_only_crowd_annotations, build_detection_train_loader
+from detectron2.modeling import GeneralizedRCNN
+from detectron2.data.build import filter_images_with_only_crowd_annotations, build_detection_train_loader, build_detection_test_loader
 from detectron2.data.samplers import InferenceSampler
 from detectron2.data.catalog import DatasetCatalog, MetadataCatalog
 from detectron2.data.datasets import load_coco_json, register_coco_instances
@@ -30,13 +31,14 @@ from fvcore.nn.giou_loss import giou_loss
 from detectron2.utils.events import EventStorage, get_event_storage
 from detectron2.structures import pairwise_iou, Boxes, BoxMode
 
-from aldi.config import add_aldi_config
-from aldi.methodsDirectory2Fast import perturb_by_dropout, dropout_masks
+#from aldi.config import add_aldi_config
+#from aldi.methodsDirectory2Fast import perturb_by_dropout, dropout_masks
 
-from model_selection.utils import get_model_shortname, load_model_weights, build_evaluator
+from model_selection.utils import get_model_shortname, load_model_weights, build_evaluator, perturb_by_dropout, dropout_masks
+from modelSeleTools_DAS.methodsDirectory2Fast import perturb_model_parameters
 
 # Override box_loss methods to use mean
-from .box_loss import _mean_dense_box_regression_loss, classifier_loss_on_gt_boxes
+from .box_loss import _mean_dense_box_regression_loss, classifier_loss_on_gt_boxes, get_outputs_with_image_id
 current_module = sys.modules['detectron2.modeling.proposal_generator.rpn']
 setattr(current_module, '_dense_box_regression_loss', _mean_dense_box_regression_loss)
 current_module = sys.modules['detectron2.modeling.roi_heads.fast_rcnn']
@@ -63,9 +65,13 @@ class ModelSelection:
         self.cfg = self.update_cfg_loss(cfg)
         self.model = build_model(self.cfg)
         self.model.eval()
+        self.perturb_method = perturb_by_dropout if cfg.MODEL_SELECTION.PERTURB_TYPE == "dropout" else perturb_model_parameters
 
         # Calculate dropout_masks so they can be used consistently throughout experiments
-        self.perturbation_masks = [dropout_masks(self.model, p=cfg.MODEL_SELECTION.DROPOUT) for _ in range(cfg.MODEL_SELECTION.N_PERTURBATIONS)]
+        if cfg.MODEL_SELECTION.PERTURB_TYPE == "dropout":
+            self.perturbation_masks = [dropout_masks(self.model, p=cfg.MODEL_SELECTION.DROPOUT) for _ in range(cfg.MODEL_SELECTION.N_PERTURBATIONS)]
+        else:
+            self.perturbation_masks = None
 
         if cfg.MODEL_SELECTION.N_TRANSFORMED_SOURCE > 0:
             new_source_ds = []
@@ -127,7 +133,7 @@ class ModelSelection:
             fast_rcnn.fast_rcnn_inference_single_image = fast_rcnn_inference_single_image_all_scores
             evaluator = build_evaluator(cfg, dataset_name, self.evaluation_dir, do_eval=True)
             forward_hook_returns = []
-            forward_hook_handle = self.model.register_forward_hook(lambda module, input, output: forward_hook_returns.append(output))
+            forward_hook_handle = self.model.register_forward_hook(lambda module, inputs, outputs: forward_hook_returns.extend(get_outputs_with_image_id(inputs, outputs)))
             results = DefaultTrainer.test(self.cfg, self.model, evaluator) 
             forward_hook_handle.remove()
             
@@ -139,51 +145,60 @@ class ModelSelection:
                         neptune_run[f"metrics/{model_shortname}/{unique_dataset_name}/{k}"] = v
                 del evaluator
 
-            dataset_file, pseudo_dataset_name = save_pseudo_coco_file(model_weights, self.evaluation_dir, dataset_name,
-                                                                      cfg.MODEL_SELECTION.SCORE_THRESHOLD)
+            dataset_file, pseudo_dataset_name = save_pseudo_coco_file(model_weights, self.evaluation_dir, dataset_name)
             register_coco_instances(pseudo_dataset_name, {}, dataset_file, "./")
 
             ### B) Calculate losses with perturbed model against pseudo label coco annotations         
             losses_perturbed = defaultdict(list)
-            for n_perturb in range(len(self.perturbation_masks)):
+            for n_perturb in range(self.cfg.MODEL_SELECTION.N_PERTURBATIONS):
                 # Perturb model with dropout mask
                 model_copied = copy.deepcopy(self.model)
-                model_copied = perturb_by_dropout(model_copied, p=cfg.MODEL_SELECTION.DROPOUT, mask_dict=self.perturbation_masks[n_perturb])
+                model_copied = self.perturb_method(model_copied, p=self.cfg.MODEL_SELECTION.DROPOUT, mask_dict=self.perturbation_masks, n=n_perturb)
 
                 # B1) Calculate classification loss (classifier head loss) with perturbed model using pseudo gt boxes
                 # Build data_loader from pseudo label dataset
                 dataset = DatasetCatalog.get(pseudo_dataset_name)
                 #data_loader = build_detection_train_loader(cfg, sampler=InferenceSampler(len(dataset))) # todo: need to use pseudo datasets
-                data_loader = build_detection_train_loader(
-                    dataset=dataset[:10],
+                data_loader = build_detection_test_loader(
+                    dataset=dataset,
                     mapper=DatasetMapper(cfg, True),
-                    sampler=InferenceSampler(10), #(len(dataset)),
-                    total_batch_size=cfg.SOLVER.IMS_PER_BATCH,
-                    aspect_ratio_grouping=cfg.DATALOADER.ASPECT_RATIO_GROUPING,
+                    sampler=InferenceSampler(len(dataset)),
+                    #total_batch_size=cfg.SOLVER.IMS_PER_BATCH,
+                    #aspect_ratio_grouping=cfg.DATALOADER.ASPECT_RATIO_GROUPING,
                     num_workers=cfg.DATALOADER.NUM_WORKERS)
-                losses = self.run_dataset(data_loader, model_copied) # Will calculate losses with pseudo label boxes
-                for k in losses.keys():
-                    losses_perturbed[k].append(losses[k])
+                # From FIS build_detection_test_loader(test_dataset, mapper=DatasetMapper(cfg, False), sampler=InferenceSampler(len(test_dataset)))    
+                perturbed_predictions, perturbed_scores_logits = self.run_dataset(data_loader, model_copied) # Will calculate losses with pseudo label boxes
                     
                 # B2) Calculate box loss with perturbed model compared to pseudo gt boxes
                 # Generate perturbed boxes by running inference with perturbed model
-                perturbed_evaluation_dir = os.path.join(self.evaluation_dir, 'perturbed')
-                evaluator = build_evaluator(cfg, dataset_name, perturbed_evaluation_dir, do_eval=False)
-                cls_loss_returns = []
+                #perturbed_evaluation_dir = os.path.join(self.evaluation_dir, 'perturbed')
+                #evaluator = build_evaluator(cfg, dataset_name, perturbed_evaluation_dir, do_eval=False)
+                #cls_loss_returns = []
                 # todo: pass in pred_instances from psuedo into hook
-                cls_loss_hook_handle = model_copied.roi_heads.register_forward_hook(
-                    lambda module, inputs, outputs: cls_loss_returns.append(classifier_loss_on_gt_boxes(module, inputs)))        
-                _ = DefaultTrainer.test(self.cfg, model_copied, evaluator) # use predicted boxes saved from this evaluation           
-                cls_loss_hook_handle.remove()
+                #cls_loss_hook_handle = model_copied.roi_heads.register_forward_hook(
+                #    lambda module, inputs, outputs: cls_loss_returns.append(classifier_loss_on_gt_boxes(module, inputs)))        
+                #_ = DefaultTrainer.test(self.cfg, model_copied, evaluator) # use predicted boxes saved from this evaluation           
+                #cls_loss_hook_handle.remove()
                 
                 # Now take the results and compare to pseudo gt boxes
-                box_losses = calc_box_loss(pseudo_dataset_name, perturbed_evaluation_dir)
+                #box_losses = calc_box_loss(pseudo_dataset_name, perturbed_evaluation_dir)
+                box_losses = calc_box_loss(forward_hook_returns, perturbed_predictions)
                 losses_perturbed['loss_box_giou'].append(box_losses[0]) # todo: doesn't normalize boxes.  Is this needed??
                 losses_perturbed['loss_box_smooth_l1'].append(box_losses[1])
                 losses_perturbed['loss_box_iou'].append(box_losses[2])
                 
+                kl_loss = calc_score_logits_loss(forward_hook_returns, perturbed_scores_logits)
+                losses_perturbed['loss_score_logits'].append(kl_loss)
+
+            # Average perturbed losses
             losses_perturbed = {k: (float(np.average(v)), float(np.std(v))) for k, v in losses_perturbed.items() if
                                 "loss" in k}
+
+            # Calculate entropy losses
+            entropy_loss, info_max_reg = calc_entropy_measures(forward_hook_returns)
+            losses_perturbed['entropy']= entropy_loss
+            losses_perturbed['info_max_reg'] = info_max_reg
+            
             if neptune_run is not None:
                 for k, v in losses_perturbed.items():
                     if "loss" in k:
@@ -204,7 +219,7 @@ class ModelSelection:
         # Run calculations over all of dataset
         logger.info("model_selection: Start calculations on dataset")
     
-        model.training = True
+        #model.training = True
         #model.train() # put it in train so losses are calculated #todo: might be able to remove this
         
         # Create hook on model.roi_heads._forward_box(features, proposals)
@@ -215,6 +230,7 @@ class ModelSelection:
         start_iter = 0
         self.iter = start_iter
         self.storage = EventStorage()
+        predictions = []
         with EventStorage(start_iter) as self.storage:
             try:
                 
@@ -233,7 +249,15 @@ class ModelSelection:
                         total_compute_time = 0    
                     start_compute_time = time.perf_counter()
                     
-                    _ = self.run_step(inputs, model)
+                    outputs = self.run_step(inputs, model)
+                    # Based on inference_on_dataset and coco_evaluation.process
+                    for input, output in zip(inputs, outputs):
+                        prediction = {"image_id": input["image_id"]}
+                        if "instances" in output:
+                            instances = output["instances"].to("cpu")
+                            #prediction["instances"] = instances_to_coco_json(instances, input["image_id"])
+                            prediction["instances"] = instances # Boxes (XYXY)
+                            predictions.append(prediction)
                     
                     if torch.cuda.is_available():
                         torch.cuda.synchronize()
@@ -265,20 +289,22 @@ class ModelSelection:
         loss_cls_on_gt_boxes = [l[0] for l in cls_loss_returns]
         scores_logits = [l[1] for l in cls_loss_returns]
         cls_loss_hook_handle.remove()
-        losses_avg = {k: v._global_avg for k, v in self.storage.histories().items() if 'loss' in k}
-        losses_avg['loss_cls_gt_boxes'] = np.mean(np.array(loss_cls_on_gt_boxes))
-        losses_avg['scores_logits'] =scores_logits
-        return losses_avg
+        #losses_avg = {k: v._global_avg for k, v in self.storage.histories().items() if 'loss' in k}
+        #losses_avg['loss_cls_gt_boxes'] = np.mean(np.array(loss_cls_on_gt_boxes))
+        #losses_avg['scores_logits'] =scores_logits
+        #return losses_avg
+        return predictions, scores_logits
     
     
     def run_step(self, data, model):
         start = time.perf_counter()
-        data_time = time.perf_counter() - start
-        model.training = True # so that it calculates losses
+        #data_time = time.perf_counter() - start
+        #model.training = True # so that it calculates losses
         #model.train() 
         with torch.no_grad():
-            losses = model(data) # model in training so targets are used
-        self._write_metrics(losses, data_time) # Collates loss_dict
+            outputs = inference_with_targets(model, data) # model in training so targets are used
+        #self._write_metrics(losses, data_time) # Collates loss_dict
+        return outputs
 
 
     def get_updated_cfg_for_model_selection(self, cfg, dataset_name, seed_offset):
@@ -289,11 +315,10 @@ class ModelSelection:
         cfg.DATASETS.TRAIN = (dataset_name,)
         cfg.DATASETS.TEST = cfg.DATASETS.TRAIN
         
-        # We're using training to calculate losses but don't want to apply any augmentations.
-        cfg.INPUT.MIN_SIZE_TRAIN = 1024
-        cfg.INPUT.MAX_SIZE_TRAIN = 1024
-        #cfg.INPUT.MIN_SIZE_TEST = 1024
-        #cfg.INPUT.MAX_SIZE_TEST = 1024        
+        # We're using training to calculate losses but only want the same aug as TEST.
+        cfg.INPUT.MIN_SIZE_TRAIN = cfg.INPUT.MIN_SIZE_TEST
+        cfg.INPUT.MAX_SIZE_TRAIN = cfg.INPUT.MAX_SIZE_TEST
+        cfg.INPUT.MIN_SIZE_TRAIN_SAMPLING = 'choice' 
         cfg.INPUT.RANDOM_FLIP = "none"
         cfg.freeze()
         return cfg
@@ -321,8 +346,77 @@ class ModelSelection:
         cfg.freeze()
         return cfg
     
+def inference_with_targets(
+    model,
+    batched_inputs,
+    do_postprocess: bool = True,
+):
+    """
+    Run inference on the given inputs.
+
+    Args:
+        batched_inputs (list[dict]): same as in :meth:`forward`
+        do_postprocess (bool): whether to apply post-processing on the outputs.
+
+    Returns:
+        When do_postprocess=True, same as in :meth:`forward`.
+        Otherwise, a list[Instances] containing raw network outputs.
+    """
+    images = model.preprocess_image(batched_inputs)
+    features = model.backbone(images.tensor)
+
+    if model.proposal_generator is not None:
+        proposals, _ = model.proposal_generator(images, features, None)
+    else:
+        assert "proposals" in batched_inputs[0]
+        proposals = [x["proposals"].to(model.device) for x in batched_inputs]
+
+    if "instances" in batched_inputs[0]:
+        gt_instances = [x["instances"].to(model.device) for x in batched_inputs]
+    else:
+        gt_instances = None
+    results, _ = model.roi_heads(images, features, proposals, gt_instances)
+
+    if do_postprocess:
+        assert not torch.jit.is_scripting(), "Scripting is not supported for postprocess."
+        return GeneralizedRCNN._postprocess(results, batched_inputs, images.image_sizes)
+    return results
+
     
-def save_pseudo_coco_file(model_weights, results_path, dataset_name, score_threshold=0.5):
+def instances_to_coco_json(instances, img_id):
+    """
+    Dump an "Instances" object to a COCO-format json that's used for evaluation.
+
+    Args:
+        instances (Instances):
+        img_id (int): the image id
+
+    Returns:
+        list[dict]: list of json annotations in COCO format.
+    """
+    num_instance = len(instances)
+    if num_instance == 0:
+        return []
+
+    boxes = instances.pred_boxes.tensor.numpy()
+    boxes = BoxMode.convert(boxes, BoxMode.XYXY_ABS, BoxMode.XYWH_ABS)
+    boxes = boxes.tolist()
+    scores = instances.scores.tolist()
+    classes = instances.pred_classes.tolist()
+
+    results = []
+    for k in range(num_instance):
+        result = {
+            "image_id": img_id,
+            "category_id": classes[k],
+            "bbox": boxes[k],
+            "score": scores[k],
+        }
+        results.append(result)
+    return results
+
+
+def save_pseudo_coco_file(model_weights, results_path, dataset_name, score_threshold=0.0):
     # use the results from a test of the dataset and the original dataset
     # image list to create a new coco format file of pseudo labels.
     # Assumes results from last test were saved to inference/coco_instances_results.json
@@ -394,17 +488,17 @@ def save_pseudo_coco_file(model_weights, results_path, dataset_name, score_thres
     return dataset_file, model_dataset_name
 
 
-def calc_box_loss(dataset_name, perturbed_results_dir, threshold=0.5):
+def calc_box_loss(gt_instances, predicted_instances):
     # compare results and calc box loss
     logger.info("model_selection: Calculating box loss")
-    dataset_images = DatasetCatalog.get(dataset_name) # psuedo dataset
-    dataset_metadata = MetadataCatalog.get(dataset_name)
+    #dataset_images = DatasetCatalog.get(dataset_name) # psuedo dataset
+    #dataset_metadata = MetadataCatalog.get(dataset_name)
     # unmap the category mapping ids for COCO
-    if hasattr(dataset_metadata, "thing_dataset_id_to_contiguous_id"):
-        reverse_id_mapping = {v: k for k, v in dataset_metadata.thing_dataset_id_to_contiguous_id.items()}
-        reverse_id_mapper = lambda contiguous_id: reverse_id_mapping[contiguous_id]  # noqa
-    else:
-        reverse_id_mapper = lambda contiguous_id: contiguous_id  # noqa    
+    #if hasattr(dataset_metadata, "thing_dataset_id_to_contiguous_id"):
+    #    reverse_id_mapping = {v: k for k, v in dataset_metadata.thing_dataset_id_to_contiguous_id.items()}
+    #    reverse_id_mapper = lambda contiguous_id: reverse_id_mapping[contiguous_id]  # noqa
+    #else:
+    #    reverse_id_mapper = lambda contiguous_id: contiguous_id  # noqa    
         
     # Remove annotations which are the ground truth
     #for d in dataset_images:
@@ -413,51 +507,83 @@ def calc_box_loss(dataset_name, perturbed_results_dir, threshold=0.5):
     #    del d['annotations']
         
     # Get annotations from results from last test run  
-    coco_results_file = os.path.join(perturbed_results_dir, "coco_instances_results.json")
-    with open(coco_results_file, 'r') as file:
-        logger.info(f"model_selection: Calculating box loss - Loading results from {coco_results_file}")
-        perturbed_annotations = json.load(file) # perturbed results
-    perturbed_ann_by_image = defaultdict(list)
-    for ann in perturbed_annotations:
+    #coco_results_file = os.path.join(perturbed_results_dir, "coco_instances_results.json")
+    #with open(coco_results_file, 'r') as file:
+    #    logger.info(f"model_selection: Calculating box loss - Loading results from {coco_results_file}")
+    #    perturbed_annotations = json.load(file) # perturbed results
+    #perturbed_ann_by_image = defaultdict(list)
+    #for ann in perturbed_annotations:
         #if ann['score'] > threshold:
-        ann['category_id'] = dataset_metadata.thing_dataset_id_to_contiguous_id[ann['category_id']]
-        perturbed_ann_by_image[ann['image_id']].append(ann)
+    #    ann['category_id'] = dataset_metadata.thing_dataset_id_to_contiguous_id[ann['category_id']]
+    #    perturbed_ann_by_image[ann['image_id']].append(ann)
     
     #match_quality = 0
     giou_losses, smooth_l1_losses, iou_losses = [], [], []
     no_matches = []
-    for instance in dataset_images:
+    for gt, pred in zip(gt_instances, predicted_instances):        
+        height, width = gt["instances"].image_size
         scale_x, scale_y = (
-            1 / instance["width"],
-            1 / instance["height"],
+            1 / width,
+            1 / height,
         )
         scaling = np.array([scale_x, scale_y, scale_x, scale_y])
         
-        perturbed_anns = perturbed_ann_by_image[instance["image_id"]]
-        perturbed_boxes = np.array([BoxMode.convert(a["bbox"], BoxMode.XYWH_ABS, BoxMode.XYXY_ABS) for a in perturbed_anns])
-        if len(perturbed_anns) > 0:
-            perturbed_boxes = perturbed_boxes * scaling
-        pseudo_anns = instance['annotations']
-        pseudo_boxes = np.array([BoxMode.convert(a["bbox"], a["bbox_mode"], BoxMode.XYXY_ABS) for a in pseudo_anns])
-        if len(pseudo_anns) > 0:
-            pseudo_boxes = pseudo_boxes * scaling
+        #perturbed_anns = perturbed_ann_by_image[instance["image_id"]]
+        #perturbed_boxes = np.array([BoxMode.convert(a["bbox"], BoxMode.XYWH_ABS, BoxMode.XYXY_ABS) for a in perturbed_anns])
+        pred_boxes = np.array(pred["instances"].pred_boxes)        
+        if pred_boxes.shape[0] > 0:
+            pred_boxes = pred_boxes * scaling
+        #pseudo_anns = instance['annotations']
+        #pseudo_boxes = np.array([BoxMode.convert(a["bbox"], a["bbox_mode"], BoxMode.XYXY_ABS) for a in pseudo_anns])
+        gt_boxes = np.array(gt["instances"].pred_boxes.to("cpu"))
+        if len(gt_boxes) > 0:
+            gt_boxes = gt_boxes * scaling
         
         #max_match = min(len(perturbed_anns), len(pseudo_anns))
         # Match boxes using Faster-RCNN matching quality (from detectron2.modelling.proposal_generator.rpn)
-        match_quality_matrix = pairwise_iou(Boxes(perturbed_boxes), Boxes(pseudo_boxes)) # gt rows, perturb cols
+        match_quality_matrix = pairwise_iou(Boxes(pred_boxes), Boxes(gt_boxes)) # gt rows, perturb cols
         match_row, match_col = linear_sum_assignment(match_quality_matrix, maximize=True)
         if len(match_row) == 0:
-            no_matches.append(instance["image_id"])
+            no_matches.append(pred["image_id"])
             continue
         #match_quality += match_quality_matrix[match_row, match_col].sum().numpy().tolist() / max_match
-        giou_l = giou_loss(torch.Tensor(perturbed_boxes[match_row,:]), torch.Tensor(pseudo_boxes[match_col, :]), reduction="mean").item()
-        iou_l = complete_box_iou_loss(torch.Tensor(perturbed_boxes[match_row,:]), torch.Tensor(pseudo_boxes[match_col, :]), reduction="mean").item()
-        smooth_l1_l = F.smooth_l1_loss(torch.Tensor(perturbed_boxes[match_row,:]), torch.Tensor(pseudo_boxes[match_col, :]), reduction="mean").item()
+        giou_l = giou_loss(torch.Tensor(pred_boxes[match_row,:]), torch.Tensor(gt_boxes[match_col, :]), reduction="mean").item()
+        iou_l = complete_box_iou_loss(torch.Tensor(pred_boxes[match_row,:]), torch.Tensor(gt_boxes[match_col, :]), reduction="mean").item()
+        smooth_l1_l = F.smooth_l1_loss(torch.Tensor(pred_boxes[match_row,:]), torch.Tensor(gt_boxes[match_col, :]), reduction="mean").item()
         giou_losses.append(giou_l)
         smooth_l1_losses.append(smooth_l1_l)
         iou_losses.append(iou_l)
     logger.info(f"model_selection: No matched boxes found for image_ids {no_matches}")
     return np.mean(giou_losses), np.mean(smooth_l1_losses), np.mean(iou_losses)
+
+
+def calc_score_logits_loss(gt_instances, predicted_scores):
+    logger.info("Calculating KL divergence loss")
+    kl_loss_calc = torch.nn.KLDivLoss(reduction="batchmean")
+    gt_scores, pred_scores = [], []
+    for i, gt in enumerate(gt_instances):
+        gt_score = gt["instances"].scores_logits
+        pred_score = torch.Tensor(predicted_scores[i]).to(gt_score.device)
+        if gt_score.shape != pred_score.shape or gt_score.shape[0] == 0:
+            logger.warning(f"model_selection: gt logit and perturbed logit shapes don't match for image {i} or gt is empty - gt:{gt_score.shape}, pred:{pred_score.shape}")
+        else:
+            gt_scores.append(gt_score)
+            pred_scores.append(pred_score)
+    gt_scores = torch.vstack(gt_scores)
+    pred_scores = torch.vstack(pred_scores)    
+    # Compute KL divergence loss
+    kl_losses = kl_loss_calc(pred_scores, gt_scores)
+    return kl_losses.item()
+
+
+def calc_entropy_measures(gt_instances):
+    logger.info("model_selection: Calculating entropy measures")
+    gt_scores = [gt["instances"].scores_logits for gt in gt_instances]
+    gt_scores = torch.vstack(gt_scores)
+    entropy = torch.mean(torch.sum(torch.log(gt_scores + 1e-7) * gt_scores, dim=1)) # sum across class then mean
+    gt_scores_averaged = torch.mean(gt_scores, dim=0)
+    info_max_reg = torch.sum(torch.log(gt_scores_averaged + 1e-7)*gt_scores_averaged)
+    return entropy.item(), info_max_reg.item()
 
 
 def register_coco_instances_with_split(name, parent, json_file, image_root, indices, filter_empty):
@@ -493,7 +619,7 @@ def split_dataset_into_samples(dataset_name, sample_size, seed=0):
     np.random.shuffle(indices)
     new_ds = []
     for i in range(num_instances // sample_size):
-        new_ds_indices = indices[i * sample_size:(i + 1) * sample_size]
+        new_ds_indices = sorted(indices[i * sample_size:(i + 1) * sample_size])
         new_ds_name = f"{dataset_name}_sample_{i:03}"
         new_ds.append(new_ds_name)
         # register datasets

@@ -9,6 +9,7 @@ from aldi.evaluation import Detectron2COCOEvaluatorAdapter
 
 from modelSeleTools_DAS.fast_rcnn import fast_rcnn_inference_single_image_all_scores
 from model_selection.utils import build_evaluator
+from detectron2.structures import pairwise_iou, Boxes, BoxMode
 
 from scipy.optimize import linear_sum_assignment
 import copy
@@ -16,7 +17,7 @@ import torch
 import torch.nn.functional as F
 
 
-def perturb_model_parameters(module):
+def perturb_model_parameters(module, **kwargs):
     # Based on DAS.  rcnn.py in DAobjTwoStagePseudoLabGeneralizedRCNN.inference method.
     # Applies perturbation to model rather than in the model class.
     
@@ -123,7 +124,7 @@ def FIS(cfg, model, dataloaders, max_repeat):
 
         iou_loss = IoUCost()
         num_flag = 0
-        least_cost_final = 0
+        least_cost_final, iou_cost_v2, iou_cost_v1, kl_cost_v1, kl_cost_v2 = 0, 0, 0, 0, 0
 
         for img_idx in range(len(results_logits_per_img)):
             _bboxes = results_bbox_per_img[img_idx]
@@ -138,28 +139,47 @@ def FIS(cfg, model, dataloaders, max_repeat):
 
             if len(_bboxes.shape) < 2 or len(_bboxes_perturbe.shape) < 2:
                 continue
+                
+            
 
+            
             sampleCnt, _ = _bboxes.shape
             sampleCntPerturb, _ = _bboxes_perturbe.shape
             max_match = min(sampleCnt, sampleCntPerturb)
             num_flag += 1
-
+            
+            match_quality_matrix = pairwise_iou(Boxes(_bboxes_perturbe), Boxes(_bboxes)) # gt rows, perturb cols
+            match_row_iou, match_col_iou = linear_sum_assignment(match_quality_matrix, maximize=True)
+            
             iou_cost = iou_loss(_bboxes_perturbe, _bboxes)
             kl_div = computeKLDivergenceMatrix(_logits_perturbe, _logits)
 
             costMatrix = iou_cost + kl_div * _lambda
             matched_rowIdx, matched_colIdx = linear_sum_assignment(costMatrix)
             least_cost_final += costMatrix[matched_rowIdx, matched_colIdx].sum().numpy().tolist() / max_match
-        least_cost_final /= num_flag
+            iou_cost_v1 += iou_cost[matched_rowIdx, matched_colIdx].sum().numpy().tolist() / max_match
+            iou_cost_v2 += iou_cost[match_row_iou, match_col_iou].sum().numpy().tolist() / max_match
+            kl_cost_v1 += kl_div[matched_rowIdx, matched_colIdx].sum().numpy().tolist() / max_match
+            kl_cost_v2 += kl_div[match_row_iou, match_col_iou].sum().numpy().tolist() / max_match
 
-        scores_perModel[_lambda].append(round(least_cost_final, 4))
+        least_cost_final /= num_flag
+        iou_cost_v2 /= num_flag
+        iou_cost_v1 /= num_flag
+        kl_cost_v1 /= num_flag
+        kl_cost_v2 /= num_flag
+
+        scores_perModel[_lambda].append(least_cost_final)
         print((scores_perModel))
         del model_copied
 
     ground_truth = res["bbox"]["AP50"]
 
     return {"score": scores_perModel,
-            "ground_truth": round(ground_truth, 4),}
+            "ground_truth": ground_truth,
+            "iou_cost_v2": iou_cost_v2,
+            "iou_cost_v1": iou_cost_v1,
+            "kl_cost_v2": kl_cost_v2,
+            "kl_cost_v1": kl_cost_v1,}
 
 
 def PDR(cfg, model, dataloaders, max_repeat):
@@ -273,7 +293,9 @@ def _fp16_clamp(x, min=None, max=None):
 
 
 def _bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
-
+    """Based on mmdet/structures/bbox/bbox_overlaps.py via BoS implementation.
+    
+    """
     assert mode in ['iou', 'iof', 'giou'], f'Unsupported mode {mode}'
     # Either the boxes are empty or the length of boxes' last dimension is 4
     assert (bboxes1.size(-1) == 4 or bboxes1.size(0) == 0)

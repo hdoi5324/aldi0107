@@ -47,8 +47,8 @@ from detectron2.evaluation import inference_on_dataset
 # Keep this so that datasets are loaded
 import aldi.datasets # register datasets with Detectron2
 
+from model_selection.utils import load_model_weights, perturb_by_dropout, build_evaluator, setup, save_results_dict
 from modelSeleTools_DAS.fast_rcnn import fast_rcnn_inference_single_image_all_scores
-from model_selection.utils import load_model_weights, perturb_by_dropout,build_evaluator, setup, save_results_dict
 
 
 def parse_args():
@@ -176,7 +176,10 @@ def fp16_clamp(x, min=None, max=None):
 
 
 def bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
-    """Calculate overlap between two set of bboxes.
+    """
+    NB Based on from mmdet/structures/bbox/bbox_overlaps.py
+    
+    Calculate overlap between two set of bboxes.
     FP16 Contributed by https://github.com/open-mmlab/mmdetection/pull/4889
     Note:
         Assume bboxes1 is M x 4, bboxes2 is N x 4, when mode is 'iou',
@@ -508,7 +511,8 @@ def main(args):
     bos_results_dict = {}
     for model_dir in model_dirs: 
         # [MAIN]
-        bos_results_dict[os.path.basename(model_dir)] = {}
+        bos_results_dict[model_dir] = {}
+        bos_results_dict[model_dir][cfg.DATASETS.TEST[0]] = {}
         # Load model
         model = build_model(cfg)
         model.eval()
@@ -673,8 +677,8 @@ def main(args):
             least_reg_cost_final[area_idx] = least_reg_cost_final[area_idx] / (num_flag[area_idx])
             least_iou_cost_final[area_idx] = least_iou_cost_final[area_idx] / (num_flag[area_idx])
             #least_cls_cost_final[area_idx] = least_cls_cost_final[area_idx] / (num_flag[area_idx])
-        bos_results_dict[os.path.basename(model_dir)]["BoS"] = least_iou_cost_final[0] * -1
-        bos_results_dict[os.path.basename(model_dir)]["ground_truth"] = res["bbox"]["AP50"]
+        bos_results_dict[model_dir][cfg.DATASETS.TEST[0]]["BoS"] = least_iou_cost_final[0] * -1
+        bos_results_dict[model_dir][cfg.DATASETS.TEST[0]]["ground_truth"] = res["bbox"]["AP50"]
         pprint.pp(bos_results_dict)
 
 
@@ -683,16 +687,12 @@ def main(args):
         normalized_array = (array - np.min(array)) / (np.max(array) - np.min(array))
         return normalized_array.tolist()
     
-    model_keys = [k for k in list(bos_results_dict.keys()) if "model_" in k]
-    all_bos = [bos_results_dict[mk]["BoS"] for mk in model_keys]
+    all_bos = [bos_results_dict[mk][cfg.DATASETS.TEST[0]]["BoS"] for mk in list(bos_results_dict.keys())]
     normalized_bos = normalize(np.array(all_bos))
-    for i, mk in enumerate(model_keys):
-        bos_results_dict[mk][f"BoS_normalized"] = normalized_bos[i]
+    for i, mk in enumerate(list(bos_results_dict.keys())):
+        bos_results_dict[mk][cfg.DATASETS.TEST[0]][f"BoS_normalized"] = normalized_bos[i]
     
     # Save outputs to file
-    bos_results_dict['output_dir'] = cfg.OUTPUT_DIR
-    bos_results_dict['target_dataset'] = cfg.DATASETS.TEST[0]
-    bos_results_dict['source_dataset'] = cfg.DATASETS.TRAIN
     bos_results_dict['config_file'] = args.config_file
     
     _ = save_results_dict(bos_results_dict, cfg.OUTPUT_DIR, measure_name="BoS")

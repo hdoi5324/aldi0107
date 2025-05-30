@@ -32,8 +32,8 @@ from PIL import Image
 
 import sys, os
 import time
-from modelSeleTools_DAS.methodsDirectory2Fast import *
 from model_selection.utils import setup, save_results_dict
+from modelSeleTools_DAS.methodsDirectory2Fast import *
 
 
 def get_voc_2012_test_images(dirname):
@@ -176,7 +176,6 @@ def main(args):
     result, all_result_dict = calculateMultiFast(cfg, model_dirs, [FIS, PDR])
     
     # Save results dictionary
-    all_result_dict['output_dir'] = cfg.OUTPUT_DIR
     all_result_dict['target_dataset'] = cfg.DATASETS.TEST[0]
     all_result_dict['source_dataset'] = cfg.DATASETS.TRAIN
     all_result_dict['config_file'] = args.config_file    
@@ -200,13 +199,18 @@ def main(args):
     for mk in model_keys:
         all_result_dict[mk]["DAS"] = all_result_dict[mk]["FIS_normalized"] + all_result_dict[mk]["PDR_normalized"]
     
+    # Add tested dataset into results dataset dictionary
+    new_results = {}
+    for mk, mk_data in all_result_dict.items():
+        new_results[mk] = {cfg.DATASETS.TEST[0]: mk_data}
+    
     # Save outputs to file
-    _ = save_results_dict(all_result_dict, cfg.OUTPUT_DIR, measure_name="DAS")
+    _ = save_results_dict(new_results, cfg.OUTPUT_DIR, measure_name="DAS")
         
     #with open(os.path.join(cfg.OUTPUT_DIR, 'DAS_outputs.json'), 'r') as file:
     #    data = json.load(file)
     
-    return all_result_dict
+    return new_results
 
 
 if __name__ == "__main__":

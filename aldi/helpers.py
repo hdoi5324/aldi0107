@@ -101,8 +101,8 @@ def split_dataset_labelled_unlabelled(dataset_name, num_labelled, filter_empty=T
     indices = np.arange(num_instances)
     np.random.seed(seed)
     np.random.shuffle(indices)
-    labelled_indices = indices[:num_labelled]
-    unlabelled_indices = indices[num_labelled:]
+    labelled_indices = sorted(indices[:num_labelled])
+    unlabelled_indices = sorted(indices[num_labelled:])
 
     #register datasets
     register_coco_instances_with_split(f"{dataset_name}_labelled", metadata.name, metadata.json_file, metadata.image_root, labelled_indices, filter_empty)
@@ -111,29 +111,6 @@ def split_dataset_labelled_unlabelled(dataset_name, num_labelled, filter_empty=T
         return f"{dataset_name}_labelled", f"{dataset_name}_unlabelled"
     else:
         return f"{dataset_name}_labelled", None
-
-
-def split_dataset_into_samples(dataset_name, sample_size, filter_empty=True, seed=0):
-    # get metadata
-    metadata = MetadataCatalog.get(dataset_name)
-
-    # get dataset and split indices
-    dataset_dicts = DatasetCatalog.get(dataset_name)
-    if filter_empty:
-        dataset_dicts = filter_images_with_only_crowd_annotations(dataset_dicts)
-    num_instances = len(dataset_dicts)
-    indices = np.arange(num_instances)
-    np.random.seed(seed)
-    np.random.shuffle(indices)
-    new_ds = []
-    for i in range(num_instances//sample_size):
-        new_ds_indices = indices[i*sample_size:(i+1)*sample_size]
-        new_ds_name = f"{dataset_name}_sample_{i:03}"
-        new_ds.append(new_ds_name)
-        #register datasets
-        register_coco_instances_with_split(new_ds_name, metadata.name, metadata.json_file, metadata.image_root, new_ds_indices, filter_empty)
-    new_ds = [dataset_name] if len(new_ds) == 0 else new_ds
-    return new_ds
 
 
 def register_coco_instances_with_split(name, parent, json_file, image_root, indices, filter_empty):

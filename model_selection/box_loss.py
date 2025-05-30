@@ -87,6 +87,7 @@ def classifier_loss_on_gt_boxes(module, inputs):
         #todo: change this to compare to raw scores from gt
         features = [features[f].detach() for f in module.box_in_features]
         
+        # todo: change this to iterate through inputs 
         # Get class predictions for gt-boxes
         gt_boxes = [x.gt_boxes for x in targets]
         box_features = module.box_pooler(features, gt_boxes)
@@ -95,17 +96,27 @@ def classifier_loss_on_gt_boxes(module, inputs):
         del box_features
         
         scores, proposal_deltas = predictions
-        #todo: do same as predict_probs from OutputLayer ie softmax
-    
-        gt_classes = (
-            cat([p.gt_classes for p in targets], dim=0) if len(targets) else torch.empty(0)
-        )
-        if module.box_predictor.use_sigmoid_ce:
-            loss_cls = module.box_predictor.sigmoid_cross_entropy_loss(scores, gt_classes)
-            probs = scores.sigmoid()
+        if scores.shape[0] != len(gt_boxes[0]):
+            print(scores.shape[0], len(gt_boxes[0]))
+            return None
         else:
-            loss_cls = cross_entropy(scores, gt_classes, reduction="mean")    
-            probs = F.softmax(scores, dim=-1)    
-        return loss_cls.detach().to("cpu").numpy(), probs.to("cpu").numpy()
+            #todo: do same as predict_probs from OutputLayer ie softmax
+        
+            gt_classes = (
+                cat([p.gt_classes for p in targets], dim=0) if len(targets) else torch.empty(0)
+            )
+            if module.box_predictor.use_sigmoid_ce:
+                loss_cls = module.box_predictor.sigmoid_cross_entropy_loss(scores, gt_classes)
+                probs = scores.sigmoid()
+            else:
+                loss_cls = cross_entropy(scores, gt_classes, reduction="mean")    
+                probs = F.softmax(scores, dim=-1)    
+            return loss_cls.detach().to("cpu").numpy(), probs.to("cpu").numpy()
     else:
         return None
+
+def get_outputs_with_image_id(inputs, outputs):
+    """Calculate the loss based on the difference in class prediction for the gt boxes."""
+    for i, o in enumerate(outputs):
+        o["image_id"] = inputs[0][i]['image_id']
+    return outputs

@@ -43,7 +43,7 @@ def main(args):
     """
     cfg = setup(args)
     selector = ModelSelection(cfg, 
-                              [], #list(cfg.DATASETS.TRAIN), 
+                              source_ds=(cfg.DATASETS.TRAIN), 
                               target_ds=list(cfg.DATASETS.TEST), 
                               )
     
@@ -55,22 +55,22 @@ def main(args):
     if comm.is_main_process() and False:
         run, hook = setup_neptune_logging("ACFRmarine/Unsupervised-Model-Selection", cfg.LOGGING.API_TOKEN, cfg.LOGGING.ITERS, cfg.LOGGING.TAGS, cfg.LOGGING.GROUP_TAGS, cfg.LOGGING.PROXY)
         hook.base_handler["config"] = stringify_unsupported(cfg) 
-        # todo: record ModelSelection parameters OR put them in config.
     else:
         run = None
         
     outputs = OrderedDict()
     for m_idx, model_weights in enumerate(model_paths):
         outputs[model_weights] = {}
-        model_output_src = selector.run_model_selection(model_weights, source=True, neptune_run=run) 
-        outputs[model_weights].update(model_output_src)
+        #model_output_src = selector.run_model_selection(model_weights, source=True, neptune_run=run) 
+        #outputs[model_weights].update(model_output_src)
         model_output_tgt = selector.run_model_selection(model_weights, source=False, neptune_run=run) 
         outputs[model_weights].update(model_output_tgt)
                     
         # Save outputs in case you want to quit early
+        measure_name = "MINED" if cfg.MODEL_SELECTION.PERTURB_TYPE == "dropout" else "MINE"
         if comm.is_main_process():
             _ = save_outputs(outputs, selector.evaluation_dir)
-            _ = save_results_dict(outputs, cfg.OUTPUT_DIR, measure_name="MINE")
+            _ = save_results_dict(outputs, cfg.OUTPUT_DIR, measure_name=measure_name)
             
     if comm.is_main_process():
         logger.info(f"model_selection: output: {pprint.pformat(outputs)}")
