@@ -28,6 +28,9 @@ def fast_rcnn_inference_single_image_all_scores(
     topk_per_image: int,
 ):
     """
+    Updated version of fast_rcnn_inference_single_image from detectron2 that
+    returns logits for all classes.
+    
     Single-image inference. Return bounding-box detection results by thresholding
     on scores and applying non-maximum suppression (NMS).
 
@@ -43,7 +46,9 @@ def fast_rcnn_inference_single_image_all_scores(
         boxes = boxes[valid_mask]
         scores = scores[valid_mask]
         
+    ## CHANGE HERE 
     scores_logits = scores.clone().detach()
+    ## FINISH CHANGE
     scores = scores[:, :-1]
     
     num_bbox_reg_classes = boxes.shape[1] // 4
@@ -76,7 +81,8 @@ def fast_rcnn_inference_single_image_all_scores(
     result.scores = scores
     result.pred_classes = filter_inds[:, 1]
     
+    ## CHANGE HERE
     scores_logits = scores_logits[filter_inds[:, 0]]
     result.scores_logits = scores_logits
-
+    ## END CHANGE
     return result, filter_inds[:, 0]

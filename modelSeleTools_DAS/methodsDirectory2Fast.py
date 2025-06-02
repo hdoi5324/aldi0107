@@ -58,7 +58,8 @@ def perturb_model_parameters(module, **kwargs):
     return module
 
 
-def FIS(cfg, model, dataloaders, max_repeat):
+def FIS(cfg, model, dataloaders, max_repeat=1):
+    #todo: update max_repeat code so it works eg captures repeat values then averages them after returned.
     from detectron2.modeling.roi_heads import fast_rcnn 
     fast_rcnn.fast_rcnn_inference_single_image = fast_rcnn_inference_single_image_all_scores    
     
@@ -91,10 +92,10 @@ def FIS(cfg, model, dataloaders, max_repeat):
         results_logits_per_img.append(logits_per_img)
 
     scores_perModel = {}
-    lambdas = [1]
+    lambdas = [1] * max_repeat
     for key in lambdas:
         scores_perModel[key] = []
-    for repeat_time in range(1):
+    for repeat_time in range(max_repeat):
         _lambda = lambdas[repeat_time]
         print("\nrepeat time: {}".format(repeat_time))
         model_copied = copy.deepcopy(model)

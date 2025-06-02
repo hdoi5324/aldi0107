@@ -181,9 +181,8 @@ class ModelSelection:
                 #cls_loss_hook_handle.remove()
                 
                 # Now take the results and compare to pseudo gt boxes
-                #box_losses = calc_box_loss(pseudo_dataset_name, perturbed_evaluation_dir)
                 box_losses = calc_box_loss(forward_hook_returns, perturbed_predictions)
-                losses_perturbed['loss_box_giou'].append(box_losses[0]) # todo: doesn't normalize boxes.  Is this needed??
+                losses_perturbed['loss_box_giou'].append(box_losses[0])
                 losses_perturbed['loss_box_smooth_l1'].append(box_losses[1])
                 losses_perturbed['loss_box_iou'].append(box_losses[2])
                 
@@ -518,7 +517,7 @@ def calc_box_loss(gt_instances, predicted_instances):
     #    perturbed_ann_by_image[ann['image_id']].append(ann)
     
     #match_quality = 0
-    giou_losses, smooth_l1_losses, iou_losses = [], [], []
+    ious, gious, smooth_l1_losses = [], [], []
     no_matches = []
     for gt, pred in zip(gt_instances, predicted_instances):        
         height, width = gt["instances"].image_size
@@ -541,20 +540,19 @@ def calc_box_loss(gt_instances, predicted_instances):
         
         #max_match = min(len(perturbed_anns), len(pseudo_anns))
         # Match boxes using Faster-RCNN matching quality (from detectron2.modelling.proposal_generator.rpn)
-        match_quality_matrix = pairwise_iou(Boxes(pred_boxes), Boxes(gt_boxes)) # gt rows, perturb cols
-        match_row, match_col = linear_sum_assignment(match_quality_matrix, maximize=True)
-        if len(match_row) == 0:
+        pairwise_iou_matrix = pairwise_iou(Boxes(pred_boxes), Boxes(gt_boxes)) # gt rows, perturb cols
+        match_row_pairwise_iou, match_col_pairwise_iou = linear_sum_assignment(pairwise_iou_matrix, maximize=True)
+        if len(match_row_pairwise_iou) == 0:
             no_matches.append(pred["image_id"])
             continue
-        #match_quality += match_quality_matrix[match_row, match_col].sum().numpy().tolist() / max_match
-        giou_l = giou_loss(torch.Tensor(pred_boxes[match_row,:]), torch.Tensor(gt_boxes[match_col, :]), reduction="mean").item()
-        iou_l = complete_box_iou_loss(torch.Tensor(pred_boxes[match_row,:]), torch.Tensor(gt_boxes[match_col, :]), reduction="mean").item()
-        smooth_l1_l = F.smooth_l1_loss(torch.Tensor(pred_boxes[match_row,:]), torch.Tensor(gt_boxes[match_col, :]), reduction="mean").item()
-        giou_losses.append(giou_l)
+        iou = pairwise_iou_matrix[match_row_pairwise_iou, match_col_pairwise_iou].mean().item()
+        giou = 1-giou_loss(torch.Tensor(pred_boxes[match_row_pairwise_iou,:]), torch.Tensor(gt_boxes[match_col_pairwise_iou, :]), reduction="mean").item() 
+        smooth_l1_l = F.smooth_l1_loss(torch.Tensor(pred_boxes[match_row_pairwise_iou,:]), torch.Tensor(gt_boxes[match_col_pairwise_iou, :]), reduction="mean").item()
+        ious.append(iou)
+        gious.append(giou)
         smooth_l1_losses.append(smooth_l1_l)
-        iou_losses.append(iou_l)
     logger.info(f"model_selection: No matched boxes found for image_ids {no_matches}")
-    return np.mean(giou_losses), np.mean(smooth_l1_losses), np.mean(iou_losses)
+    return np.mean(gious), np.mean(smooth_l1_losses), np.mean(ious)
 
 
 def calc_score_logits_loss(gt_instances, predicted_scores):
