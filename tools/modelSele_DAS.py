@@ -18,8 +18,6 @@ import aldi.backbone # register ViT FPN backbone with Detectron2
 
 # #from adapteacher.engine.trainer import ATeacherTrainer, BaselineTrainer
 
-from model_selection.utils import load_model_weights
-
 # hacky way to register
 #from adapteacher.modeling.meta_arch.rcnn import TwoStagePseudoLabGeneralizedRCNN, DAobjTwoStagePseudoLabGeneralizedRCNN
 #from adapteacher.modeling.meta_arch.vgg import build_vgg_backbone  # noqa
@@ -32,7 +30,8 @@ from PIL import Image
 
 import sys, os
 import time
-from model_selection.utils import setup, save_results_dict
+from model_selection.utils import save_results_dict
+from model_selection.model_selection import setup, load_model_weights
 from modelSeleTools_DAS.methodsDirectory2Fast import *
 
 

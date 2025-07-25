@@ -1,61 +1,13 @@
-import os
 import json
+import os
 import pprint
+
 import pandas as pd
-
 import torch
-from detectron2.checkpoint import DetectionCheckpointer
-from fvcore.common.checkpoint import _IncompatibleKeys
-
-from detectron2.data.catalog import DatasetCatalog, MetadataCatalog
+from detectron2.data.catalog import DatasetCatalog
 from detectron2.evaluation import DatasetEvaluators
-from aldi.evaluation import Detectron2COCOEvaluatorAdapter
-from detectron2.config import get_cfg
-from aldi.config import add_aldi_config
-from aldi.config_aldi_only import add_aldi_only_config
-from detectron2.engine import default_setup
 
-def setup(args):
-    """
-    Copied from detectron2/tools/train_net.py
-    """
-    cfg = get_cfg()
-
-    ## Change here
-    add_aldi_config(cfg)
-    add_aldi_only_config(cfg)  # adds a couple of keys as configs have diverged.
-    ## End change
-
-    cfg.merge_from_file(args.config_file)
-    cfg.merge_from_list(args.opts)
-    cfg.freeze()
-    default_setup(cfg, args)
-    return cfg
-
-        
-def get_model_shortname(model_weights):
-    return os.path.basename(model_weights)[:-4]
-
-
-def load_model_weights(path, model):
-    checkpointer = DetectionCheckpointer(model)  
-    ret = checkpointer.load(path)
-
-    if path.endswith(".pth") and "ema" in ret.keys():
-        # self.logger.info("Loading EMA weights as model starting point.")
-        ema_dict = {
-            k.replace('model.', ''): v for k, v in ret['ema'].items()
-        }
-        # incompatible = self.model.load_state_dict(ema_dict, strict=False)
-        ret['model'] = ema_dict
-        incompatible = checkpointer._load_model(ret)
-        if incompatible is not None:
-            checkpointer._log_incompatible_keys(_IncompatibleKeys(
-                missing_keys=incompatible.missing_keys,
-                unexpected_keys=incompatible.unexpected_keys,
-                incorrect_shapes=[]
-            ))
-    return ret
+from aldi.helpers import Detectron2COCOEvaluatorAdapter
 
 
 def build_evaluator(cfg, dataset_name, output_folder=None, do_eval=True):
@@ -80,16 +32,16 @@ def build_evaluator(cfg, dataset_name, output_folder=None, do_eval=True):
 
 def dropout_mask_along_channel(weights, p):
     if p > 0:
-        mask = (torch.rand(weights.shape[0], weights.shape[1], 1, 1) > p).float().to(weights.device)
-        mask = mask.expand_as(weights)
-        mask = mask / (1 - p)
+        dropout = torch.nn.Dropout2d(p=p)
+        mask = torch.ones((weights.shape)).float().to(weights.device)
+        mask = dropout(mask)
     else:
         mask = torch.ones((weights.shape[0], weights.shape[1], 1, 1)).float().to(weights.device)
         mask = mask.expand_as(weights)
     return mask
 
 
-def dropout_masks(module, p=.1, weights_filter='res4.2.conv3.weight'):
+def dropout_masks(module, weights_filter, p=.1):
     state_dict = module.state_dict()
     last_layer_parameters = [(k, v) for k, v in state_dict.items() if weights_filter in k]
     mask_dict = {}
@@ -98,12 +50,22 @@ def dropout_masks(module, p=.1, weights_filter='res4.2.conv3.weight'):
     return mask_dict
 
 
-def perturb_by_dropout(module, p=.1, mask_dict={}, n=0, weights_filter='res4.2.conv3.weight', **kwargs):
-    mask_dict = mask_dict[n] if n in mask_dict else {}
+def perturb_by_dropout(module, layer_name='fpn_output', p=.1, mask_dict={}, n=0, layer_nos=[5], **kwargs):
+    """
+    Apply dropout to weights with names matching {layer_name}{layer_no}. 
+    Assumes there is a .weights for 2d dropout and a bias.
+    Update module with state_dict with dropout applied.
+    """
     state_dict = module.state_dict()
-    last_layer_parameters = [(k, v) for k, v in state_dict.items() if weights_filter in k]
-    for (k, w) in last_layer_parameters:
-        state_dict[k] = w * mask_dict[k] if k in mask_dict else w * dropout_mask_along_channel(w, p)
+    mask_dict = mask_dict[n] if n in mask_dict else {}
+    for l in layer_nos:
+        weight_parameters = [(k, v) for k, v in state_dict.items() if f"{layer_name}{l}.weight" in k]
+        bias_parameters = [(k, v) for k, v in state_dict.items() if f"{layer_name}{l}.bias" in k]
+        for (k, w) in weight_parameters:
+            mask = mask_dict[k] if k in mask_dict else dropout_mask_along_channel(w, p) 
+            state_dict[k] = w * mask
+            for bk, bias_w in bias_parameters:
+                state_dict[bk] = bias_w * mask [:, 0, 0, 0].squeeze()
     incompatiable_keys = module.load_state_dict(state_dict, strict=False)
     print(incompatiable_keys)
     return module
@@ -136,3 +98,87 @@ def save_results_dict(results_dict, output_dir, measure_name=""):
     with open(filename, 'w') as file:
         json.dump(results_dict, file)
     return filename
+
+
+def _fp16_clamp(x, min=None, max=None):
+    if not x.is_cuda and x.dtype == torch.float16:
+        # clamp for cpu float16, tensor fp16 has no clamp implementation
+        return x.float().clamp(min, max).half()
+
+    return x.clamp(min, max)
+
+
+def _bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
+    """Based on mmdet/structures/bbox/bbox_overlaps.py via BoS implementation.
+    
+    """
+    assert mode in ['iou', 'iof', 'giou'], f'Unsupported mode {mode}'
+    # Either the boxes are empty or the length of boxes' last dimension is 4
+    assert (bboxes1.size(-1) == 4 or bboxes1.size(0) == 0)
+    assert (bboxes2.size(-1) == 4 or bboxes2.size(0) == 0)
+
+    # Batch dim must be the same
+    # Batch dim: (B1, B2, ... Bn)
+    assert bboxes1.shape[:-2] == bboxes2.shape[:-2]
+    batch_shape = bboxes1.shape[:-2]
+
+    rows = bboxes1.size(-2)
+    cols = bboxes2.size(-2)
+    if is_aligned:
+        assert rows == cols
+
+    if rows * cols == 0:
+        if is_aligned:
+            return bboxes1.new(batch_shape + (rows, ))
+        else:
+            return bboxes1.new(batch_shape + (rows, cols))
+
+    area1 = (bboxes1[..., 2] - bboxes1[..., 0]) * (
+        bboxes1[..., 3] - bboxes1[..., 1])
+    area2 = (bboxes2[..., 2] - bboxes2[..., 0]) * (
+        bboxes2[..., 3] - bboxes2[..., 1])
+
+    if is_aligned:
+        lt = torch.max(bboxes1[..., :2], bboxes2[..., :2])  # [B, rows, 2]
+        rb = torch.min(bboxes1[..., 2:], bboxes2[..., 2:])  # [B, rows, 2]
+
+        wh = _fp16_clamp(rb - lt, min=0)
+        overlap = wh[..., 0] * wh[..., 1]
+
+        if mode in ['iou', 'giou']:
+            union = area1 + area2 - overlap
+        else:
+            union = area1
+        if mode == 'giou':
+            enclosed_lt = torch.min(bboxes1[..., :2], bboxes2[..., :2])
+            enclosed_rb = torch.max(bboxes1[..., 2:], bboxes2[..., 2:])
+    else:
+        lt = torch.max(bboxes1[..., :, None, :2],
+                       bboxes2[..., None, :, :2])  # [B, rows, cols, 2]
+        rb = torch.min(bboxes1[..., :, None, 2:],
+                       bboxes2[..., None, :, 2:])  # [B, rows, cols, 2]
+
+        wh = _fp16_clamp(rb - lt, min=0)
+        overlap = wh[..., 0] * wh[..., 1]
+
+        if mode in ['iou', 'giou']:
+            union = area1[..., None] + area2[..., None, :] - overlap
+        else:
+            union = area1[..., None]
+        if mode == 'giou':
+            enclosed_lt = torch.min(bboxes1[..., :, None, :2],
+                                    bboxes2[..., None, :, :2])
+            enclosed_rb = torch.max(bboxes1[..., :, None, 2:],
+                                    bboxes2[..., None, :, 2:])
+
+    eps = union.new_tensor([eps])
+    union = torch.max(union, eps)
+    ious = overlap / union
+    if mode in ['iou', 'iof']:
+        return ious
+    # calculate gious
+    enclose_wh = _fp16_clamp(enclosed_rb - enclosed_lt, min=0)
+    enclose_area = enclose_wh[..., 0] * enclose_wh[..., 1]
+    enclose_area = torch.max(enclose_area, eps)
+    gious = ious - (enclose_area - union) / enclose_area
+    return gious
