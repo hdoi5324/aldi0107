@@ -30,7 +30,10 @@ from fvcore.nn.giou_loss import giou_loss
 
 from detectron2.utils.events import EventStorage, get_event_storage
 from detectron2.structures import pairwise_iou, Boxes, BoxMode
-
+from fvcore.nn.giou_loss import giou_loss
+from detectron2.evaluation import inference_on_dataset
+from detectron2.utils.memory import retry_if_cuda_oom
+from detectron2.structures import pairwise_iou, Boxes
 #from aldi.config import add_aldi_config
 #from aldi.methodsDirectory2Fast import perturb_by_dropout, dropout_masks
 
@@ -304,6 +307,33 @@ class ModelSelection:
             outputs = inference_with_targets(model, data) # model in training so targets are used
         #self._write_metrics(losses, data_time) # Collates loss_dict
         return outputs
+
+    def run_step_inference(self, data, model):
+        assert model.training, "[ModelSelection] model was changed to eval mode!"
+        assert torch.cuda.is_available(), "[ModelSelection] CUDA is required for training!"
+
+        start = time.perf_counter()
+        data_time = time.perf_counter() - start
+        outputs = model(data)
+
+        if isinstance(loss_dict, torch.Tensor):
+            loss_dict = {"total_loss": loss_dict}
+
+        # Match boxes using Faster-RCNN matching quality (from detectron2.modelling.proposal_generator.rpn)
+        match_quality_matrix = pairwise_iou(outputs.gt_boxes, data.targets)  # gt rows, perturb cols
+        match_row, match_col = linear_sum_assignment(match_quality_matrix, maximize=True)
+
+        # From BoS - which doesn't use perturb but dropout
+        #iou_cost_final = iou_cost
+        #iou_matched_row_inds, iou_matched_col_inds = linear_sum_assignment(iou_cost_final)
+        #least_iou_cost_final = iou_cost_final[match_row, match_col].sum().numpy().tolist() / max_match
+
+        # Mine
+        giou_cost = giou_loss(_bboxes_perturbe[match_row, :], _bboxes[match_col, :], reduction="mean").item()
+
+        loss_dict = {'loss_box_reg_giou': giou_cost}
+        self._write_metrics(loss_dict, data_time)
+
 
 
     def get_updated_cfg_for_model_selection(self, cfg, dataset_name, seed_offset):
