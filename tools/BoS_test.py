@@ -1,8 +1,6 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import argparse
 import os
-import os.path as osp
-import time
 import warnings
 import pprint
 
@@ -25,9 +23,6 @@ import torch
 import numpy as np
 #import matplotlib.mlab as mlab
 #import matplotlib.pyplot as plt
-from scipy.stats import norm
-from scipy import stats
-import json
 import copy
 import glob
 from scipy import stats
@@ -37,18 +32,17 @@ from scipy import stats
 #import seaborn as sns
 
 from scipy.optimize import linear_sum_assignment
-from detectron2.engine import default_argument_parser, default_setup, launch
-from detectron2.data import DatasetCatalog, MetadataCatalog
+from detectron2.engine import default_argument_parser, launch
 from detectron2.modeling import build_model
-from detectron2.data.build import get_detection_dataset_dicts, build_detection_train_loader, build_detection_test_loader, DatasetMapper
+from detectron2.data.build import get_detection_dataset_dicts, build_detection_test_loader, DatasetMapper
 from detectron2.data.samplers import InferenceSampler
 from detectron2.evaluation import inference_on_dataset
 
 # Keep this so that datasets are loaded
-import aldi.datasets # register datasets with Detectron2
 
-from model_selection.utils import load_model_weights, perturb_by_dropout, build_evaluator, setup, save_results_dict
-from modelSeleTools_DAS.fast_rcnn import fast_rcnn_inference_single_image_all_scores
+from model_selection.utils import perturb_by_dropout, build_evaluator, save_results_dict
+from model_selection.model_selection import setup, load_model_weights
+from model_selection.fast_rcnn import fast_rcnn_inference_single_image_all_scores
 
 
 def parse_args():

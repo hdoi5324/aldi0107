@@ -14,3 +14,5 @@ python tools/visualize_data.py --source dataloader --output-dir outputs/urchinin
 
 
 python tools/visualize_data.py --source dataloader --output-dir outputs/urchininf/mt_inf_udd/udd_test --config configs/urchininf/MeanTeacher-urchininf.yaml MODEL.WEIGHTS 'outputs/urchininf/mt_inf_udd/model_final.pth' ${GROUP_TAGS}
+
+python tools/visualize_data.py --source dataloader --output-dir outputs/redcup/redcup_baseline_strongaug_ema/redcup_test --config ../aldi/configs/imosauv/Base-RCNN-FPN-redcup_strongaug_ema.yaml MODEL.WEIGHTS '../aldi/outputs/redcup/redcup_baseline_strongaug_ema/model_final.pth' LOGGING.GROUP_TAGS "CLW,TEST"

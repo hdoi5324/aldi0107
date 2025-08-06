@@ -7,16 +7,14 @@ import pprint
 import time
 import copy
 import numpy as np
-from collections import defaultdict, OrderedDict
-from typing import List, Mapping, Optional
+from collections import defaultdict
 import torch
+from detectron2.checkpoint import DetectionCheckpointer
+from detectron2.config import get_cfg
+from fvcore.common.checkpoint import _IncompatibleKeys
 from scipy.optimize import linear_sum_assignment
-import pandas as pd
 
 import torch.nn.functional as F
-from torchvision.ops import complete_box_iou_loss
-import detectron2.data.transforms as T
-from detectron2.config import get_cfg
 from detectron2.modeling import GeneralizedRCNN
 from detectron2.data.build import filter_images_with_only_crowd_annotations, build_detection_train_loader, build_detection_test_loader
 from detectron2.data.samplers import InferenceSampler
@@ -30,10 +28,7 @@ from fvcore.nn.giou_loss import giou_loss
 
 from detectron2.utils.events import EventStorage, get_event_storage
 from detectron2.structures import pairwise_iou, Boxes, BoxMode
-from fvcore.nn.giou_loss import giou_loss
-from detectron2.evaluation import inference_on_dataset
-from detectron2.utils.memory import retry_if_cuda_oom
-from detectron2.structures import pairwise_iou, Boxes
+
 #from aldi.config import add_aldi_config
 #from aldi.methodsDirectory2Fast import perturb_by_dropout, dropout_masks
 

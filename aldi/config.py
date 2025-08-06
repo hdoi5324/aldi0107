@@ -66,6 +66,8 @@ def add_aldi_config(cfg):
     _C.DOMAIN_ADAPT.DISTILL.CLS_TMP = 1.0
     _C.DOMAIN_ADAPT.DISTILL.OBJ_TMP = 1.0
     _C.DOMAIN_ADAPT.CLS_LOSS_TYPE = "CE" # one of: { "CE", "KL" }
+    # Sparsely-Annotated Object Detection
+    _C.DOMAIN_ADAPT.DISTILL.SUPERVISED_ENABLED = True
 
     # Teacher model provides pseudo labels
     # TODO: Could be merged into DISTILL settings somehow
@@ -128,12 +130,25 @@ def add_aldi_config(cfg):
     _C.DATALOADER.FILTER_UNLABELED_EMPTY_ANNOTATIONS = False
 
     _C.MODEL_SELECTION = CN()
-    _C.MODEL_SELECTION.PERTURB_TYPE = "dropout" # "dropout" OR "DAS"
+    _C.MODEL_SELECTION.CALCULATE = True
+    _C.MODEL_SELECTION.MEASURES = ['iou'] # giou, kl, ioukl, gioukl
+    _C.MODEL_SELECTION.PERTURB_TYPE = "dropout" # "dropout" OR "das"
     _C.MODEL_SELECTION.DROPOUT = 0.1
     _C.MODEL_SELECTION.N_PERTURBATIONS = 1
     _C.MODEL_SELECTION.N_TRANSFORMED_SOURCE = 0   
     _C.MODEL_SELECTION.N_SAMPLE = 250
     
+    
+    
+    _C.UMS = CN()
+    _C.UMS.UNLABELED = None
+    _C.UMS.CHECKPOINT_PERIOD = 1000
+    _C.UMS.DROPOUT = 0.1
+    
+    
     # In later Detectron2
     _C.DATALOADER.REPEAT_SQRT = True 
     _C.FLOAT32_PRECISION = ''
+
+    _C.SAOD = CN()
+    _C.SAOD.LABELING_METHOD = "StudentTeacher"

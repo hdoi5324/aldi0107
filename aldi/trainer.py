@@ -1,6 +1,8 @@
 import os
 import copy
 import logging
+
+from matplotlib.transforms import nonsingular
 from torch.nn.parallel import DistributedDataParallel as DDP
 
 from detectron2.checkpoint.detection_checkpoint import DetectionCheckpointer
@@ -19,7 +21,9 @@ from aldi.dropin import DefaultTrainer, AMPTrainer, SimpleTrainer
 #from aldi.dataloader import SaveWeakDatasetMapper, UMTDatasetMapper, UnlabeledSaveWeakDatasetMapper, UnlabeledUMTDatasetMapper, WeakStrongDataloader
 from aldi.dataloader import SaveWeakDatasetMapper, UnlabeledDatasetMapper, WeakStrongDataloader
 from aldi.ema import EMA
-from aldi.evaluation import Detectron2COCOEvaluatorAdapter, Detectron2COCOIOUEvaluatorAdapter
+from aldi.evaluation import Detectron2COCOIOUEvaluatorAdapter
+from aldi.helpers import Detectron2COCOEvaluatorAdapter
+
 from aldi.model import build_aldi
 
 DEBUG = False
@@ -44,8 +48,9 @@ def run_model_labeled_unlabeled(trainer, labeled_weak, labeled_strong, unlabeled
      model_batch_size = trainer.model_batch_size # TODO this could be None
 
      _model = model.module if type(model) == DDP else model
-     do_weak = labeled_weak is not None
-     do_strong = labeled_strong is not None
+     is_sparse = "Sparse" in str(type(trainer.distiller))
+     do_weak = labeled_weak is not None and not is_sparse #todo: find better way to do this
+     do_strong = labeled_strong is not None and not is_sparse 
      do_align = any( [ getattr(_model, a, None) is not None for a in ["img_align", "ins_align", "sada_heads"] ] )
      do_distill = trainer.distiller.distill_enabled()
 
@@ -68,7 +73,7 @@ def run_model_labeled_unlabeled(trainer, labeled_weak, labeled_strong, unlabeled
           """
           for k, v in losses.items():
                if key_conditional(k):
-                    v /= num_grad_accum_steps
+                    v = v / num_grad_accum_steps
                     if not backward_at_end: 
                          v = v.detach()
                     loss_dict[f"{k}_{suffix}"] = loss_dict.get(f"{k}_{suffix}", 0) + v
@@ -111,7 +116,10 @@ def run_model_labeled_unlabeled(trainer, labeled_weak, labeled_strong, unlabeled
 
      # Distillation losses
      if do_distill:
-          do_distill_step(unlabeled_weak, unlabeled_strong, "distill", lambda k: k != "_")
+          if is_sparse:
+               do_distill_step(labeled_weak, labeled_strong, "distill", lambda k: k != "_")
+          else:
+               do_distill_step(unlabeled_weak, unlabeled_strong, "distill", lambda k: k != "_")
           if DEBUG: 
             debug_dict['last_pseudolabeled'] = copy.deepcopy(unlabeled_strong)
 
@@ -204,6 +212,22 @@ class ALDITrainer(DefaultTrainer):
                     for test_set in self.cfg.DATASETS.TEST:
                          ret.insert(-1, BestCheckpointer(self.cfg.TEST.EVAL_PERIOD, self.checkpointer,
                                                     f"{test_set}/bbox/AP50", "max", file_prefix=f"{test_set}_model_best"))
+                      
+          ## CHANGE Add EvalHook and BestCheckpointer hook to capture UMS measures
+          if self.cfg.UMS.UNLABELED is not None:
+               #todo: cater for multiple unlabeled datasets
+               from model_selection.ums import test_ums
+               ums_eval_hook = hooks.EvalHook(self.cfg.UMS.CHECKPOINT_PERIOD, lambda: test_ums(self.cfg, self.ema.model))
+               if comm.is_main_process():
+                    ret.insert(-1, ums_eval_hook) # before PeriodicWriter if in main process
+                    ret.insert(-1, BestCheckpointer(self.cfg.UMS.CHECKPOINT_PERIOD, self.checkpointer,
+                                                    f"umsdas/ioukl", "max", file_prefix=f"{self.cfg.UMS.UNLABELED}_umsdas_ioukl_model_best"))                 
+                    ret.insert(-1, BestCheckpointer(self.cfg.UMS.CHECKPOINT_PERIOD, self.checkpointer,
+                                                    f"umsdropout/ioukl_kl", "max", file_prefix=f"{self.cfg.UMS.UNLABELED}_umsdropout_ioukl_kl_model_best"))                 
+               else:
+                    ret.append(ums_eval_hook)
+          ## END UMS hooks
+         
           return ret
      
      @classmethod

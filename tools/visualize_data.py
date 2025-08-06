@@ -32,6 +32,7 @@ from aldi.config import add_aldi_config
 from aldi.ema import EMA
 from aldi.trainer import ALDITrainer
 import aldi.datasets # register datasets with Detectron2
+import aldi.datasets_benthic
 import aldi.model # register ALDI R-CNN model with Detectron2
 import aldi.backbone # register ViT FPN backbone with Detectron2
 
@@ -121,7 +122,7 @@ def main(args) -> None:
                 #img = img.permute(1, 2, 0).cpu().detach().numpy()
                 img = utils.convert_image_to_rgb(img, cfg.INPUT.FORMAT)
 
-                visualizer = Visualizer(img, metadata=metadata, scale=scale, font_size_scale=scale)
+                visualizer = Visualizer(img, metadata=metadata, scale=scale) #, font_size_scale=scale)
                 dic = coco_data.get(inputs['image_id'], None)
 
                 # Save text file with bounding boxes

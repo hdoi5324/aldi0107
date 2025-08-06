@@ -30,7 +30,9 @@ from aldi.trainer import ALDITrainer
 import aldi.datasets # register datasets with Detectron2
 import aldi.model # register ALDI R-CNN model with Detectron2
 import aldi.backbone # register ViT FPN backbone with Detectron2
-from aldi.helpers import split_train_data
+from aldi.split_datasets import split_train_data
+import aldi.datasets_benthic # register datasets with Detectron2
+import aldi.distill_saod
 
 
 def setup(args):
