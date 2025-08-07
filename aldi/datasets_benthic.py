@@ -57,6 +57,7 @@ register_coco_instances("squidle_urchin_2009_train_with_target", {}, "datasets/s
 register_coco_instances("squidle_east_tas_urchins_train", {}, "datasets/squidle_coco/squidle_east_tas_urchins/annotations/instances_train2023.json", "datasets/squidle_coco/squidle_east_tas_urchins/train2023")
 register_coco_instances("squidle_east_tas_urchins_train_without_target", {}, "datasets/squidle_coco/squidle_east_tas_urchins/annotations/instances_train2023_without_target.json", "datasets/squidle_coco/squidle_east_tas_urchins/train2023")
 register_coco_instances("squidle_east_tas_urchins_train_with_target", {}, "datasets/squidle_coco/squidle_east_tas_urchins/annotations/instances_train2023_with_target.json", "datasets/squidle_coco/squidle_east_tas_urchins/train2023")
+register_coco_instances("squidle_urchin_train", {}, "datasets/squidle_coco/squidle_urchin_full_train/annotations/instances_train2023.json", "datasets/squidle_coco/squidle_urchin_full_train/images")
 
 register_coco_instances("squidle_pretrain_train", {}, "datasets/squidle_coco/handfish_iros/squidle_handfish_pretrain/annotations/instances_train2023.json", "datasets/squidle_coco/handfish_iros/squidle_handfish_pretrain/train2023")
 register_coco_instances("squidle_pretrain_test", {}, "datasets/squidle_coco/handfish_iros/squidle_handfish_pretrain/annotations/instances_test2023.json", "datasets/squidle_coco/handfish_iros/squidle_handfish_pretrain/test2023")
@@ -88,14 +89,12 @@ register_coco_instances("sim10k_cars_train_transformed0", {"image_dir_prefix": "
 register_coco_instances("sim10k_cars_train_transformed1", {"image_dir_prefix": "datasets/sim10k/images", "translated_image_dir": f"datasets/daod-strong-baseline-cyclegan-results/sim10k2cityscapes/test_20/images/fake_A"},             "datasets/sim10k/coco_car_annotations.json",                  "datasets/sim10k/images_transformed_1/")
 register_coco_instances("sim10k_cars_train_transformed2", {"image_dir_prefix": "datasets/sim10k/images", "translated_image_dir": f"datasets/daod-strong-baseline-cyclegan-results/sim10k2cityscapes/test_20/images/fake_A"},             "datasets/sim10k/coco_car_annotations.json",                  "datasets/sim10k/images_transformed_2/")
 
+register_coco_instances("loose_redcup_train", {}, "datasets/loose/loose_test/annotations/instances_train.json", "datasets/loose/loose_test/images")
+register_coco_instances("loose_redcup_train_erased_only", {}, "datasets/loose/loose_test/annotations/instances_train_erased_only.json", "datasets/loose/loose_test/images")
+register_coco_instances("loose_redcup_train_cropped_only", {}, "datasets/loose/loose_test/annotations/instances_train_cropped_only.json", "datasets/loose/loose_test/images")
+register_coco_instances("squidle_redcup_test", {}, "datasets/squidle_coco/squidle_redcup_17550/annotations/instances_test.json", "datasets/squidle_coco/squidle_redcup_17550/test2023")
+register_coco_instances("squidle_redcup_train", {}, "datasets/squidle_coco/squidle_redcup_full_train/annotations/instances_train.json", "datasets/squidle_coco/squidle_redcup_full_train/images")
 
-register_coco_instances("loose_redcup_train", {}, "datasets/loose/loose_redcup_train/annotations/instances_train.json", "datasets/loose/loose_redcup_train/images")
-register_coco_instances("loose_redcup_train_erased_only", {}, "datasets/loose/loose_redcup_train/annotations/instances_train_erased_only.json", "datasets/loose/loose_redcup_train/images")
-register_coco_instances("loose_redcup_train_cropped_only", {}, "datasets/loose/loose_redcup_train/annotations/instances_train_cropped_only.json", "datasets/loose/loose_redcup_train/images")
-register_coco_instances("squidle_redcup_test", {}, "datasets/squidle_coco/squidle_redcup_test/annotations/instances_test.json", "datasets/squidle_coco/squidle_redcup_test/test2023")
-
-
-register_coco_instances("loose_urchin_train", {}, "datasets/loose/loose_urchin_train/annotations/instances_train.json", "datasets/loose/loose_urchin_train/images")
+register_coco_instances("loose_urchin_train", {}, "datasets/loose/loose_urchin/annotations/instances_train.json", "datasets/loose/loose_urchin/images")
 register_coco_instances("loose_urchin_train_erased_only", {}, "datasets/loose/loose_urchin/annotations/instances_train_erased_only.json", "datasets/loose/loose_urchin/images")
 register_coco_instances("loose_urchin_train_cropped_only", {}, "datasets/loose/loose_urchin/annotations/instances_train_cropped_only.json", "datasets/loose/loose_urchin/images")
-register_coco_instances("squidle_urchin_test", {}, "datasets/squidle_coco/squidle_urchin_2011/annotations/instances_test2023.json", "datasets/squidle_coco/squidle_urchin_2011/test2023")
