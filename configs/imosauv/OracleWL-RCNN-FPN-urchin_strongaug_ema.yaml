@@ -4,18 +4,17 @@ MODEL:
   ROI_HEADS:
     NUM_CLASSES: 1
 DATASETS:
-  TRAIN: ("loose_redcup_train",)
-  TEST: ("squidle_redcup_test",)
+  TRAIN: ("squidle_urchin_train",)
+  TEST: ("squidle_urchin_2011_test",)
   BATCH_CONTENTS: ("labeled_strong", )
 EMA:
   ENABLED: True
 SOLVER:
-  STEPS: (17999,) # 
-  MAX_ITER: 18000 # 3 X 3000
+  STEPS: (8999,) #
+  MAX_ITER: 9000 # 3 X 3000
   CHECKPOINT_PERIOD: 1000
-  IMS_PER_GPU: 4
+  IMS_PER_BATCH: 16
+  IMS_PER_GPU: 8
 LOGGING:
-  TAGS: "Base,RCCN-FPN,StrongAugEMA"
-OUTPUT_DIR: "outputs/redcup/redcup_baseline_strongaug_ema/"
-LOGGING:
-  TAGS: "Base,RCCN-FPN,StrongAugEMA"
+  TAGS: "Oracle,RCCN-FPN,StrongAugEMA"
+OUTPUT_DIR: "outputs/weakloose/urchin_oracle_strongaug_ema/"

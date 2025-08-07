@@ -17,5 +17,3 @@ SOLVER:
 LOGGING:
   TAGS: "Base,RCCN-FPN,StrongAugEMA"
 OUTPUT_DIR: "outputs/imosauv/imosauv_baseline_strongaug_ema/"
-LOGGING:
-  TAGS: "Base,RCCN-FPN,StrongAugEMA"
