@@ -168,3 +168,5 @@ cython_debug/
 /execute_all.out
 /outputs/
 /.neptune/
+/groundtruths/
+/detections/
