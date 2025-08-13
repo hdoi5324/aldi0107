@@ -28,7 +28,7 @@ SOLVER:
   STEPS: (8999,) # 
   MAX_ITER: 9000 # 3 X 3000
   CHECKPOINT_PERIOD: 1000
-  IMS_PER_GPU: 4
+#  IMS_PER_GPU: 4
 OUTPUT_DIR: "outputs/redcup/redcup_costudent_strongaug_ema/"
 LOGGING:
   TAGS: "SAOD,RCCN-FPN,StrongAugEMA"
