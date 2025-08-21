@@ -27,7 +27,8 @@ class SparseStudentTeacherDistiller(Distiller):
     """
 
     def __init__(self, teacher, student, do_hard_cls=False, do_hard_obj=False, do_hard_rpn_reg=False, do_hard_roi_reg=False,
-                 pseudo_label_threshold=0.8, pseudo_label_method="thresholding", saod_labeling_method="StudentTeacher"):
+                 pseudo_label_threshold=0.8, pseudo_label_method="thresholding", saod_labeling_method="StudentTeacher", 
+                 weak_loss_gamma=1.0, strong_loss_gamma=1.0):
         set_attributes(self, locals())
         self.register_hooks()
         self.pseudo_labeler = SparseStudentTeacherPseudoLabeler(teacher, student, pseudo_label_threshold, threshold_method=pseudo_label_method, labeling_method=saod_labeling_method)
@@ -41,7 +42,9 @@ class SparseStudentTeacherDistiller(Distiller):
                                              do_hard_roi_reg=cfg.DOMAIN_ADAPT.DISTILL.HARD_ROIH_REG_ENABLED,
                                              pseudo_label_threshold=cfg.DOMAIN_ADAPT.TEACHER.THRESHOLD,
                                              pseudo_label_method=cfg.DOMAIN_ADAPT.TEACHER.PSEUDO_LABEL_METHOD,
-                                             saod_labeling_method=cfg.SAOD.LABELING_METHOD)
+                                             saod_labeling_method=cfg.SAOD.LABELING_METHOD,
+                                             weak_loss_gamma=cfg.SAOD.WEAK_LOSS,
+                                             strong_loss_gamma=cfg.SAOD.STRONG_LOSS,)
 
     def distill_enabled(self):
         return True
@@ -80,12 +83,12 @@ class SparseStudentTeacherDistiller(Distiller):
         if self.saod_labeling_method != "CoStudent":
             standard_losses = self.student(weak_batched_inputs)
         else:
+            # standard_losses = self.student(strong_batched_inputs) # Used in SAOD2
             standard_losses = self.student(weak_batched_inputs)
             strong_losses = self.student(strong_batched_inputs) # weak pred denoised by teacher and merged with gt
             for k, v in standard_losses.items():
-                standard_losses[k] = (v + strong_losses[k])/2
+                standard_losses[k] = (self.weak_loss_gamma*v + self.strong_loss_gamma*strong_losses[k])/(self.weak_loss_gamma + self.strong_loss_gamma)
 
-        # return to eval mode if necessary
         if was_eval: 
             self.teacher.eval()
             

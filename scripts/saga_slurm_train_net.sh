@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH --account=nn10058k --job-name=benthic_daod  # create a short name for your job
-#SBATCH --partition=a100 --gpus=2
+#SBATCH --partition=accel --gpus=2
 #SBATCH --time=1-0:0:0
 #SBATCH --nodes=1                # node count
 #SBATCH --ntasks-per-node=1      # total number of tasks per node

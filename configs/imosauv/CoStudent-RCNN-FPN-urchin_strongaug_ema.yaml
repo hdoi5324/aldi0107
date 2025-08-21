@@ -4,10 +4,10 @@ MODEL:
   ROI_HEADS:
     NUM_CLASSES: 1
 INPUT:
-  MIN_SIZE_TRAIN: (800, 832, 864, 896) #, 928, 960, 992, 1024)
+  MIN_SIZE_TRAIN: (800, 832, 864, 896, 928, 960, 992, 1024) #, 928, 960, 992, 1024)
 DATASETS:
   TRAIN: ("loose_urchin_train",)
-  TEST: ("squidle_urchin_test",)
+  TEST: ("squidle_urchin_2011_test",)
   BATCH_CONTENTS: ("labeled_strong","labeled_weak",)
   BATCH_RATIOS: (1,1,)
 EMA:
@@ -28,7 +28,6 @@ SOLVER:
   STEPS: (8999,) # 
   MAX_ITER: 9000 # 3 X 3000
   CHECKPOINT_PERIOD: 1000
-  IMS_PER_GPU: 4
 OUTPUT_DIR: "outputs/imosauv/urchin_costudent_strongaug_ema/"
 LOGGING:
-  TAGS: "SAOD,RCCN-FPN,StrongAugEMA"
+  TAGS: "SAOD,RCCN-FPN"

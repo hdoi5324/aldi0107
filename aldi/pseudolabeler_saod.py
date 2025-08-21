@@ -1,4 +1,5 @@
 import torch
+from torch.nn.parallel import DistributedDataParallel as DDP
 
 from detectron2.structures.boxes import Boxes
 # from detectron2.structures.instances import Instances
@@ -89,7 +90,7 @@ def merge_ground_truth_costudent(targets, predictions, iou_thresold):
 
 def sparse_costudent_pseudo_label_inplace(teacher_model, student_model, labeled_weak, labeled_strong, score_threshold, threshold_method, 
                                           alpha_1_threshold=0.5, alpha_2_threshold=0.9, alpha_3_threshold=0.4):
-
+    student_model = student_model.module if type(student_model) is DDP else student_model
     was_teacher_training = teacher_model.training
     teacher_model.eval()
     was_student_training = student_model.training

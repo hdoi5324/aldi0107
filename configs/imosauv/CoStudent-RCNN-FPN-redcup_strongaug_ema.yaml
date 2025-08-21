@@ -1,34 +1,4 @@
-_BASE_: "../Base-RCNN-FPN.yaml"
-MODEL:
-  #WEIGHTS: "/home/heather/GitHub/aldi/outputs/redcup/redcup_baseline_strongaug_ema/model_final.pth"
-  ROI_HEADS:
-    NUM_CLASSES: 1
-INPUT:
-  MIN_SIZE_TRAIN: (800, 832, 864, 896) #, 928, 960, 992, 1024)
+_BASE_: "CoStudent-RCNN-FPN-urchin_strongaug_ema.yaml"
 DATASETS:
   TRAIN: ("loose_redcup_train",)
   TEST: ("squidle_redcup_test",)
-  BATCH_CONTENTS: ("labeled_strong","labeled_weak",)
-  BATCH_RATIOS: (1,1,)
-EMA:
-  ENABLED: True
-DOMAIN_ADAPT:
-  TEACHER:
-    ENABLED: True
-    THRESHOLD: 0.6
-  DISTILL:
-    DISTILLER_NAME: SparseStudentTeacherDistiller
-    HARD_ROIH_CLS_ENABLED: True
-    HARD_ROIH_REG_ENABLED: True
-    HARD_OBJ_ENABLED: True
-    HARD_RPN_REG_ENABLED: True
-SAOD:
-  LABELING_METHOD: "CoStudent" # or "CoStudent", "StudentTeacher"
-SOLVER:
-  STEPS: (8999,) # 
-  MAX_ITER: 9000 # 3 X 3000
-  CHECKPOINT_PERIOD: 1000
-#  IMS_PER_GPU: 4
-OUTPUT_DIR: "outputs/redcup/redcup_costudent_strongaug_ema/"
-LOGGING:
-  TAGS: "SAOD,RCCN-FPN,StrongAugEMA"

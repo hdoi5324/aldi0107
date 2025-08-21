@@ -22,8 +22,6 @@ def add_aldi_config(cfg):
     _C.AUG.UNLABELED_MIC_AUG = False
     _C.AUG.MIC_RATIO = 0.5
     _C.AUG.MIC_BLOCK_SIZE = 32
-    _C.AUG.MOSAIC = False
-    _C.AUG.MOSAIC_P = 0.25
 
     # EMA of student weights
     _C.EMA = CN()
@@ -152,3 +150,5 @@ def add_aldi_config(cfg):
 
     _C.SAOD = CN()
     _C.SAOD.LABELING_METHOD = "StudentTeacher"
+    _C.SAOD.WEAK_LOSS = 1.0
+    _C.SAOD.STRONG_LOSS = 1.0
