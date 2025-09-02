@@ -199,15 +199,20 @@ def Revision_PRED(Instance1, Instance2, alpha_1_threshold=0.5, alpha_2_threshold
     if len(ious)==0 or len(ious[0])==0:
         return Instances.cat([Instance1,Instance2])
 
+    # Iterate through each candidate Instance1 for each Instance2 to see if it is the best replacement (refinement)
     while(True):
 
         refine_gt_inds = (ious > alpha_1_threshold).any(dim=0)
-        refine_inds = ious.max(dim=0)[1]
-
+        #refine_inds = ious.max(dim=0)[1]
+        
+        mask = ious > alpha_1_threshold
+        masked_scores = torch.where(mask, scores1.unsqueeze(1).expand_as(ious), torch.tensor(-1.0))
+        refine_inds = masked_scores.argmax(dim=0)
+        
         refine_gt_scores = scores1[refine_inds]
         need_refine = refine_gt_scores >= scores2
 
-        lower_scores_inds = (~refine_gt_inds | ~need_refine) & refine_gt_inds
+        lower_scores_inds = ~need_refine & refine_gt_inds
 
         lower_scores_inds0 = torch.where(lower_scores_inds)[0]
 

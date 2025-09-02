@@ -253,12 +253,9 @@ class ALDITrainer(DefaultTrainer):
 
           labeled_bs = [batch_sizes[i] for i in range(len(batch_contents)) if batch_contents[i].startswith("labeled")]
           labeled_bs = max(labeled_bs) if len(labeled_bs) else 0
-          # Add 3 extra images for each mosaic aug - todo: make configurable size
-          labeled_bs = labeled_bs + int(labeled_bs * cfg.AUG.MOSAIC_P) * 3 if "labeled_multiimgaug" in batch_contents else labeled_bs
           unlabeled_bs = [batch_sizes[i] for i in range(len(batch_contents)) if batch_contents[i].startswith("unlabeled")]
           unlabeled_bs = max(unlabeled_bs) if len(unlabeled_bs) else 0
-          unlabeled_bs = unlabeled_bs + int(unlabeled_bs * cfg.AUG.MOSAIC_P) * 3 if "unlabeled_multiimgaug" in batch_contents else labeled_bs
-
+          
           # create labeled dataloader
           labeled_loader = None
           if labeled_bs > 0 and len(cfg.DATASETS.TRAIN):
@@ -267,6 +264,7 @@ class ALDITrainer(DefaultTrainer):
                     labeled_dataset = labeled_dataset[:cfg.DATASETS.TRAIN_SIZE]
                     logger = logging.getLogger("detectron2")
                     logger.info("aldi.trainer: Reducing dataset size!!! : Dataset size is now {} with {} annotations".format(len(labeled_dataset), sum([len(img['annotations']) for img in labeled_dataset])))
+               #labeled_loader = build_detection_train_loader(get_detection_dataset_dicts(cfg.DATASETS.TRAIN, filter_empty=cfg.DATALOADER.FILTER_EMPTY_ANNOTATIONS),                    
                labeled_loader = build_detection_train_loader(labeled_dataset, 
                     mapper=SaveWeakDatasetMapper(cfg, is_train=True, augmentations=get_augs(cfg, labeled=True, include_strong_augs="labeled_strong" in batch_contents)),
                     num_workers=cfg.DATALOADER.NUM_WORKERS,

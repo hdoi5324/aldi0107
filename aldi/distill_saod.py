@@ -84,11 +84,12 @@ class SparseStudentTeacherDistiller(Distiller):
             standard_losses = self.student(weak_batched_inputs)
         else:
             # standard_losses = self.student(strong_batched_inputs) # Used in SAOD2
-            standard_losses = self.student(weak_batched_inputs)
-            strong_losses = self.student(strong_batched_inputs) # weak pred denoised by teacher and merged with gt
-            for k, v in standard_losses.items():
-                standard_losses[k] = (self.weak_loss_gamma*v + self.strong_loss_gamma*strong_losses[k])/(self.weak_loss_gamma + self.strong_loss_gamma)
-
+            standard_losses = {}
+            weak_losses = self.student(weak_batched_inputs) if self.weak_loss_gamma > 0 else {}
+            strong_losses = self.student(strong_batched_inputs) if self.strong_loss_gamma > 0 else {}# weak pred denoised by teacher and merged with gt
+            loss_keys = list(set(weak_losses.keys()) | set(strong_losses.keys()))
+            for k in loss_keys:
+                standard_losses[k] = (self.weak_loss_gamma*weak_losses.get(k, 0) + self.strong_loss_gamma*strong_losses.get(k, 0))/(self.weak_loss_gamma + self.strong_loss_gamma)
         if was_eval: 
             self.teacher.eval()
             

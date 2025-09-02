@@ -104,12 +104,16 @@ def main(args):
     # Neptune logging
 @functools.lru_cache()
 def setup_neptune_logging(project, api_token, freq, tags, group_tags, proxy_server="", eval_only=False):
+    import subprocess
     proxies = {}
-    if len(proxy_server) > 0:
-        proxies = { 
-                      "http"  : proxy_server, 
-                      "https" : proxy_server, 
-                    }
+    for proxy in ['http', 'https']:
+        result = subprocess.run(f"env | grep -i {proxy}_proxy=", shell=True, capture_output=True, text=True)
+        if result.stdout:
+            proxy_value = result.stdout.strip().split('=', 1)[1]
+            proxies[proxy] = proxy_value
+        else:
+            proxies[proxy] = ""
+    print(f"proxies={proxies}")
     run = neptune_init_with_retry(project=project, api_token=api_token, proxies=proxies)
     if len(tags) > 0:
         run['sys/tags'].add(tags.split(','))

@@ -57,7 +57,8 @@ register_coco_instances("squidle_urchin_2009_train_with_target", {}, "datasets/s
 register_coco_instances("squidle_east_tas_urchins_train", {}, "datasets/squidle_coco/squidle_east_tas_urchins/annotations/instances_train2023.json", "datasets/squidle_coco/squidle_east_tas_urchins/train2023")
 register_coco_instances("squidle_east_tas_urchins_train_without_target", {}, "datasets/squidle_coco/squidle_east_tas_urchins/annotations/instances_train2023_without_target.json", "datasets/squidle_coco/squidle_east_tas_urchins/train2023")
 register_coco_instances("squidle_east_tas_urchins_train_with_target", {}, "datasets/squidle_coco/squidle_east_tas_urchins/annotations/instances_train2023_with_target.json", "datasets/squidle_coco/squidle_east_tas_urchins/train2023")
-register_coco_instances("squidle_urchin_train", {}, "datasets/squidle_coco/squidle_urchin_full_train/annotations/instances_train2023.json", "datasets/squidle_coco/squidle_urchin_full_train/images")
+register_coco_instances("squidle_urchin_train", {}, "datasets/squidle_coco/squidle_urchin_full_train/annotations/instances_train.json", "datasets/squidle_coco/squidle_urchin_full_train/images")
+register_coco_instances("squidle_urchin_train_sparse", {}, "datasets/squidle_coco/squidle_urchin_full_train_sparse/annotations/instances_train.json", "datasets/squidle_coco/squidle_urchin_full_train_sparse/images")
 
 register_coco_instances("squidle_pretrain_train", {}, "datasets/squidle_coco/handfish_iros/squidle_handfish_pretrain/annotations/instances_train2023.json", "datasets/squidle_coco/handfish_iros/squidle_handfish_pretrain/train2023")
 register_coco_instances("squidle_pretrain_test", {}, "datasets/squidle_coco/handfish_iros/squidle_handfish_pretrain/annotations/instances_test2023.json", "datasets/squidle_coco/handfish_iros/squidle_handfish_pretrain/test2023")
@@ -89,6 +90,7 @@ register_coco_instances("sim10k_cars_train_transformed0", {"image_dir_prefix": "
 register_coco_instances("sim10k_cars_train_transformed1", {"image_dir_prefix": "datasets/sim10k/images", "translated_image_dir": f"datasets/daod-strong-baseline-cyclegan-results/sim10k2cityscapes/test_20/images/fake_A"},             "datasets/sim10k/coco_car_annotations.json",                  "datasets/sim10k/images_transformed_1/")
 register_coco_instances("sim10k_cars_train_transformed2", {"image_dir_prefix": "datasets/sim10k/images", "translated_image_dir": f"datasets/daod-strong-baseline-cyclegan-results/sim10k2cityscapes/test_20/images/fake_A"},             "datasets/sim10k/coco_car_annotations.json",                  "datasets/sim10k/images_transformed_2/")
 
+# Redcup clip bbox from mass points  all then 1-2
 register_coco_instances("loose_redcup17647_train", {}, "datasets/loose/loose_17647/annotations/instances_train.json", "datasets/loose/loose_17647/images")
 register_coco_instances("loose_redcup17647_train_erased_only", {}, "datasets/loose/loose_17647/annotations/instances_train_erased_only.json", "datasets/loose/loose_17647/images")
 register_coco_instances("loose_redcup17647_train_cropped_only", {}, "datasets/loose/loose_17647/annotations/instances_train_cropped_only.json", "datasets/loose/loose_17647/images")
@@ -100,9 +102,18 @@ register_coco_instances("loose_redcup17648_train_cropped_only", {}, "datasets/lo
 register_coco_instances("loose_redcup17648_train_og_only", {}, "datasets/loose/loose_17648/annotations/instances_train_og_only.json", "datasets/loose/loose_17648/images")
 register_coco_instances("loose_redcup17648_train_noclip", {}, "datasets/loose/loose_17648/annotations/instances_train_noclip.json", "datasets/loose/loose_17648/images")
 
-register_coco_instances("squidle_redcup_test", {}, "datasets/squidle_coco/squidle_redcup_17550/annotations/instances_test.json", "datasets/squidle_coco/squidle_redcup_17550/test2023")
-register_coco_instances("squidle_redcup_train", {}, "datasets/squidle_coco/squidle_redcup_full_train/annotations/instances_train.json", "datasets/squidle_coco/squidle_redcup_full_train/images")
+# Redcup 1-2 points from bbox training set
+register_coco_instances("loose_redcup17711_train", {}, "datasets/loose/loose_17711/annotations/instances_train.json", "datasets/loose/loose_17711/images")
+register_coco_instances("loose_redcup17711_train_erased_only", {}, "datasets/loose/loose_17711/annotations/instances_train_erased_only.json", "datasets/loose/loose_17711/images")
+register_coco_instances("loose_redcup17711_train_cropped_only", {}, "datasets/loose/loose_17711/annotations/instances_train_cropped_only.json", "datasets/loose/loose_17711/images")
+register_coco_instances("loose_redcup17711_train_og_only", {}, "datasets/loose/loose_17711/annotations/instances_train_og_only.json", "datasets/loose/loose_17711/images")
+register_coco_instances("loose_redcup17711_train_noclip", {}, "datasets/loose/loose_17711/annotations/instances_train_noclip.json", "datasets/loose/loose_17711/images")
 
+register_coco_instances("squidle_redcup_test", {}, "datasets/squidle_coco/squidle_redcup_test/annotations/instances_test.json", "datasets/squidle_coco/squidle_redcup_test/test2023")
+register_coco_instances("squidle_redcup_train", {}, "datasets/squidle_coco/squidle_redcup_full_train/annotations/instances_train.json", "datasets/squidle_coco/squidle_redcup_full_train/images")
+register_coco_instances("squidle_redcup_train_sparse", {}, "datasets/squidle_coco/squidle_redcup_full_train_sparse/annotations/instances_train.json", "datasets/squidle_coco/squidle_redcup_full_train_sparse/images")
+
+# Mass point annotation datasets
 register_coco_instances("loose_urchin17630_train", {}, "datasets/loose/loose_17630/annotations/instances_train.json", "datasets/loose/loose_17630/images")
 register_coco_instances("loose_urchin17630_train_erased_only", {}, "datasets/loose/loose_17630/annotations/instances_train_erased_only.json", "datasets/loose/loose_17630/images")
 register_coco_instances("loose_urchin17630_train_cropped_only", {}, "datasets/loose/loose_17630/annotations/instances_train_cropped_only.json", "datasets/loose/loose_17630/images")
@@ -113,3 +124,18 @@ register_coco_instances("loose_urchin17631_train_erased_only", {}, "datasets/loo
 register_coco_instances("loose_urchin17631_train_cropped_only", {}, "datasets/loose/loose_17631/annotations/instances_train_cropped_only.json", "datasets/loose/loose_17631/images")
 register_coco_instances("loose_urchin17631_train_og_only", {}, "datasets/loose/loose_17631/annotations/instances_train_og_only.json", "datasets/loose/loose_17631/images")
 register_coco_instances("loose_urchin17631_train_noclip", {}, "datasets/loose/loose_17631/annotations/instances_train_noclip.json", "datasets/loose/loose_17631/images")
+
+# Urchin 1-2 points with corresponding bbox annotated dataset
+register_coco_instances("loose_urchin17714_train", {}, "datasets/loose/loose_17714/annotations/instances_train.json", "datasets/loose/loose_17714/images")
+register_coco_instances("loose_urchin17714_train_erased_only", {}, "datasets/loose/loose_17714/annotations/instances_train_erased_only.json", "datasets/loose/loose_17714/images")
+register_coco_instances("loose_urchin17714_train_cropped_only", {}, "datasets/loose/loose_17714/annotations/instances_train_cropped_only.json", "datasets/loose/loose_17714/images")
+register_coco_instances("loose_urchin17714_train_og_only", {}, "datasets/loose/loose_17714/annotations/instances_train_og_only.json", "datasets/loose/loose_17714/images")
+register_coco_instances("loose_urchin17714_train_noclip", {}, "datasets/loose/loose_17714/annotations/instances_train_noclip.json", "datasets/loose/loose_17714/images")
+
+# Sparse coco 
+register_coco_instances("coco_val", {}, "datasets/coco/annotations/instances_val2017.json", "datasets/coco/val2017")
+register_coco_instances("coco_sparse_easy", {}, "datasets/coco/annotations/instances_train2017_easy.json", "datasets/coco/train2017")
+register_coco_instances("coco_sparse_hard", {}, "datasets/coco/annotations/instances_train2017_hard.json", "datasets/coco/train2017")
+register_coco_instances("coco_sparse_extreme", {}, "datasets/coco/annotations/instances_train2017_extreme.json", "datasets/coco/train2017")
+register_coco_instances("coco_sparse_keep1", {}, "datasets/coco/annotations/keep1_instances_train2017.json", "datasets/coco/train2017")
+
