@@ -152,3 +152,4 @@ def add_aldi_config(cfg):
     _C.SAOD.LABELING_METHOD = "StudentTeacher"
     _C.SAOD.WEAK_LOSS = 1.0
     _C.SAOD.STRONG_LOSS = 1.0
+    _C.SAOD.DENOISE_PRIORITY = "iou" # "iou" or "score"

@@ -28,10 +28,12 @@ class SparseStudentTeacherDistiller(Distiller):
 
     def __init__(self, teacher, student, do_hard_cls=False, do_hard_obj=False, do_hard_rpn_reg=False, do_hard_roi_reg=False,
                  pseudo_label_threshold=0.8, pseudo_label_method="thresholding", saod_labeling_method="StudentTeacher", 
-                 weak_loss_gamma=1.0, strong_loss_gamma=1.0):
+                 weak_loss_gamma=1.0, strong_loss_gamma=1.0, denoise_priority="iou"):
         set_attributes(self, locals())
         self.register_hooks()
-        self.pseudo_labeler = SparseStudentTeacherPseudoLabeler(teacher, student, pseudo_label_threshold, threshold_method=pseudo_label_method, labeling_method=saod_labeling_method)
+        self.pseudo_labeler = SparseStudentTeacherPseudoLabeler(teacher, student, pseudo_label_threshold, 
+                                                                threshold_method=pseudo_label_method, labeling_method=saod_labeling_method,
+                                                                denoise_priority=denoise_priority)
 
     @classmethod
     def from_config(cls, cfg, teacher, student):
@@ -44,7 +46,8 @@ class SparseStudentTeacherDistiller(Distiller):
                                              pseudo_label_method=cfg.DOMAIN_ADAPT.TEACHER.PSEUDO_LABEL_METHOD,
                                              saod_labeling_method=cfg.SAOD.LABELING_METHOD,
                                              weak_loss_gamma=cfg.SAOD.WEAK_LOSS,
-                                             strong_loss_gamma=cfg.SAOD.STRONG_LOSS,)
+                                             strong_loss_gamma=cfg.SAOD.STRONG_LOSS,
+                                             denoise_priority=cfg.SAOD.DENOISE_PRIORITY)
 
     def distill_enabled(self):
         return True
@@ -80,7 +83,7 @@ class SparseStudentTeacherDistiller(Distiller):
             dot = make_dot(standard_losses['loss_cls'], params=dict(self.student.named_parameters()))
             dot.render("computation_graph", format="png")
 
-        if self.saod_labeling_method != "CoStudent":
+        if not self.saod_labeling_method.startswith("CoStudent"):
             standard_losses = self.student(weak_batched_inputs)
         else:
             # standard_losses = self.student(strong_batched_inputs) # Used in SAOD2
