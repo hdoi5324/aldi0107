@@ -26,13 +26,18 @@ except ImportError:
     
 # Keep these so that datasets are loaded
 import aldi.datasets # register datasets with Detectron2
+import aldi.datasets_benthic # register datasets with Detectron2
+import aldi.distill_saod
+from aldi.fcos.fcos import FCOS
+import aldi.fcos.align
+import aldi.fcos.distill
 
 #import aldi.model # register ALDI R-CNN model with Detectron2
 #import aldi.backbone # register ViT FPN backbone with Detectron2
 
-from model_selection.utils import save_results_dict, save_outputs
+from model_selection.utils import save_results_dict, save_outputs, setup
 
-from model_selection.model_selection import ModelSelection, get_dataset_samples, setup
+from model_selection.model_selection import ModelSelection
 
 logger = logging.getLogger("detectron2")
 
@@ -67,7 +72,6 @@ def main(args):
         outputs[model_weights].update(model_output_tgt)
                     
         # Save outputs in case you want to quit early
-        #measure_name = "MINED" if cfg.MODEL_SELECTION.PERTURB_TYPE == "dropout" else "MINE"
         measure_name = "UMS"
         if comm.is_main_process():
             _ = save_outputs(outputs, selector.evaluation_dir)

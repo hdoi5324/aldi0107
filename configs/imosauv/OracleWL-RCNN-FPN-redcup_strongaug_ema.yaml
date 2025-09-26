@@ -2,4 +2,4 @@ _BASE_: "OracleWL-RCNN-FPN-urchin_strongaug_ema.yaml"
 DATASETS:
   TRAIN: ("squidle_redcup_train",)
   TEST: ("squidle_redcup_test",)
-OUTPUT_DIR: "outputs/weakloose/redcup_oracle_strongaug_ema/"
+OUTPUT_DIR: "outputs/imosauv/redcup_oracle_strongaug_ema/"

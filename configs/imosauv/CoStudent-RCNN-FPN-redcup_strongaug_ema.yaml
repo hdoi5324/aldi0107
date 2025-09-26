@@ -2,3 +2,4 @@ _BASE_: "CoStudent-RCNN-FPN-urchin_strongaug_ema.yaml"
 DATASETS:
   TRAIN: ("loose_redcup17711_train_og_only",)
   TEST: ("squidle_redcup_test",)
+OUTPUT_DIR: "outputs/imosauv/redcup_saod/"

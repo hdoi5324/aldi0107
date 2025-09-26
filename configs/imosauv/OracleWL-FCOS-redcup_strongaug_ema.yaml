@@ -1,0 +1,5 @@
+_BASE_: "OracleWL-FCOS-urchin_strongaug_ema.yaml"
+DATASETS:
+  TRAIN: ("squidle_redcup_train",)
+  TEST: ("squidle_redcup_test",)
+OUTPUT_DIR: "outputs/imosauv/redcup_oracle_fcos_strongaug_ema/"

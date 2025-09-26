@@ -61,8 +61,6 @@ class SparseStudentTeacherDistiller(Distiller):
 
         # Make sure seeds are the same for proposal sampling in teacher/student
         self.seeder = ManualSeed()
-        teacher_model.roi_heads.register_forward_pre_hook(self.seeder)
-        student_model.roi_heads.register_forward_pre_hook(self.seeder)
         
     def _distill_forward(self, weak_batched_inputs, strong_batched_inputs):
         # first, get hard pseudo labels -- this is done in place
@@ -83,7 +81,7 @@ class SparseStudentTeacherDistiller(Distiller):
             dot = make_dot(standard_losses['loss_cls'], params=dict(self.student.named_parameters()))
             dot.render("computation_graph", format="png")
 
-        if not self.saod_labeling_method.startswith("CoStudent"):
+        if self.saod_labeling_method == "TeacherPred":
             standard_losses = self.student(weak_batched_inputs)
         else:
             # standard_losses = self.student(strong_batched_inputs) # Used in SAOD2
@@ -111,13 +109,17 @@ class SparseStudentTeacherDistiller(Distiller):
             "loss_rpn_loc": self.do_hard_rpn_reg,
             "loss_box_reg": self.do_hard_roi_reg,
         }
+        
         for k, v in hard_losses.items():
-            if loss_to_attr.get(k, False):
-                #v.requires_grad = True
-                losses[k] = v
+            if k in loss_to_attr:
+                if loss_to_attr.get(k, False):
+                    #v.requires_grad = True
+                    losses[k] = v
+                else:
+                    # Need to add to standard losses so that the optimizer can see it
+                    losses[k] = v * 0.0
             else:
-                # Need to add to standard losses so that the optimizer can see it
-                losses[k] = v * 0.0
+                losses[k] = v
 
         return losses
     

@@ -5,7 +5,7 @@ MODEL:
 SOLVER:
   BASE_LR: 0.02 # LR should be appropriate for IMS_PER_BATCH and MAX_ITERS
   STEPS: (6000, 8000) 
-  MAX_ITER: 9000 # Reduced by factor of 10 9000
+  MAX_ITER: 9001 # Reduced by factor of 10 9000
   IMS_PER_BATCH: 16 # Batch = 16 with 2 per GPU with 8 GPU = 0.02 LR
   IMS_PER_GPU: 8
   CHECKPOINT_PERIOD: 2000 #2000
@@ -13,7 +13,7 @@ VIS_PERIOD: 0
 TEST:
   EVAL_PERIOD: 500
 LOGGING:
-  API_TOKEN: "eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiI3ZWYyM2VkNS01MDkyLTRhNjMtYTk3NC03ZjAwZWZiNWYwODAifQ=="
+  API_TOKEN: "=="
   PROJECT: "ACFRmarine/ALDI-DOAD" 
   ITERS: 100
   PROXY: ""

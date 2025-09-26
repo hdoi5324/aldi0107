@@ -1,0 +1,41 @@
+MODEL:
+  META_ARCHITECTURE: "FCOS"
+  BACKBONE:
+    NAME: "build_retinanet_resnet_fpn_backbone"
+  WEIGHTS: "detectron2://ImageNetPretrained/MSRA/R-50.pkl"
+  RESNETS:
+    OUT_FEATURES: ["res3", "res4", "res5"]
+    DEPTH: 50
+  FPN:
+    IN_FEATURES: ["res3", "res4", "res5"]
+INPUT:
+  MIN_SIZE_TRAIN: (800, 832, 864, 896, 928, 960, 992, 1024) #, 928, 960, 992, 1024)
+DATASETS:
+  TRAIN: ("coco_2017_train",)
+  TEST: ("coco_2017_val",)
+SOLVER:
+  IMS_PER_BATCH: 16
+  IMS_PER_GPU: 8
+  BASE_LR: 0.01  # Note that RetinaNet uses a different default learning rate
+  STEPS: (60000, 80000)
+  MAX_ITER: 90001
+  WARMUP_ITERS: 1000
+  BACKWARD_AT_END: False
+INPUT:
+  MIN_SIZE_TRAIN: (640, 672, 704, 736, 768, 800)
+VERSION: 2
+TEST:
+  EVAL_PERIOD: 500
+DOMAIN_ADAPT:
+  DISTILL:
+    DISTILLER_NAME: HardDistiller
+    MIXIN_NAME: FCOSDistillMixin
+  ALIGN:
+    MIXIN_NAME: FCOSAlignMixin
+VIS_PERIOD: 0
+LOGGING:
+  API_TOKEN: "=="
+  PROJECT: "ACFRmarine/ALDI-DOAD" 
+  ITERS: 100
+  PROXY: ""
+SEED: 1234567

@@ -6,9 +6,13 @@ import pandas as pd
 import torch
 from detectron2.data.catalog import DatasetCatalog
 from detectron2.evaluation import DatasetEvaluators
+from detectron2.config import get_cfg
 
 from aldi.helpers import Detectron2COCOEvaluatorAdapter
-
+from aldi.config import add_aldi_config
+from aldi.config_aldi_only import add_aldi_only_config
+from aldi.config_fcos import add_fcos_config
+from aldi.detr.helpers import add_deformable_detr_config
 
 def build_evaluator(cfg, dataset_name, output_folder=None, do_eval=True):
     """Just do COCO Evaluation.
@@ -182,3 +186,22 @@ def _bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
     enclose_area = torch.max(enclose_area, eps)
     gious = ious - (enclose_area - union) / enclose_area
     return gious
+
+
+def setup(args):
+    """
+    Copied from detectron2/tools/train_net.py
+    """
+    cfg = get_cfg()
+
+    ## Change here
+    add_aldi_config(cfg)
+    add_aldi_only_config(cfg)
+    add_fcos_config(cfg)
+    add_deformable_detr_config(cfg)
+    ## End change
+
+    cfg.merge_from_file(args.config_file)
+    cfg.merge_from_list(args.opts)
+    cfg.freeze()
+    return cfg

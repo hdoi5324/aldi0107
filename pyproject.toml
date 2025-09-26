@@ -12,7 +12,7 @@ authors = [
   { name="timmh", email="timm@haucke.xyz" }
 ]
 dependencies = [
-    "pillow==9.5.0", # see: https://github.com/facebookresearch/detectron2/issues/5010
+    "pillow==10.4", # see: https://github.com/facebookresearch/detectron2/issues/5010
     "scipy",
     "opencv-python",
 #    "detectron2 @ git+https://github.com/justinkay/detectron2_v07ish.git"

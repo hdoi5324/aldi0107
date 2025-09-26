@@ -46,12 +46,11 @@ INPUT:
     SIZE: (384, 600)
   FORMAT: "RGB"
 SOLVER:
-  # BASE_LR: 0.06
-  BASE_LR: 0.0001
+  BASE_LR: 0.0002
   STEPS: (1600,)
   MAX_ITER: 2000
-  IMS_PER_BATCH: 48
-  IMS_PER_GPU: 16
+  IMS_PER_BATCH: 16
+  IMS_PER_GPU: 4
   BACKWARD_AT_END: False
   AMP:
     ENABLED: False # not supported for multiscale deformable conv
@@ -68,9 +67,6 @@ SOLVER:
   LR_BACKBONE_NAMES: ["backbone.0"]
   LR_LINEAR_PROJ_NAMES: ['reference_points', 'sampling_offsets']
   LR_LINEAR_PROJ_MULTIPLIER: 0.1
-VIS_PERIOD: 100
-TEST:
-  EVAL_PERIOD: 100
 EMA:
   START_ITER: 250 # to speed up training ; assuming 2 GPUS ~= 10 epochs
 DOMAIN_ADAPT:
@@ -79,3 +75,12 @@ DOMAIN_ADAPT:
     MIXIN_NAME: DETRDistillMixin
   ALIGN:
     MIXIN_NAME: DETRAlignMixin
+TEST:
+  EVAL_PERIOD: 500
+VIS_PERIOD: 0
+LOGGING:
+  API_TOKEN: "=="
+  PROJECT: "ACFRmarine/ALDI-DOAD" 
+  ITERS: 100
+  PROXY: ""
+SEED: 1234567

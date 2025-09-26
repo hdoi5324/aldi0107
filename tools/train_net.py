@@ -22,9 +22,10 @@ try:
     from neptune.utils import stringify_unsupported
 except ImportError:
     from neptune.new.utils import stringify_unsupported
-    
+
 from aldi.checkpoint import DetectionCheckpointerWithEMA
 from aldi.config import add_aldi_config
+from aldi.config_fcos import add_fcos_config
 from aldi.ema import EMA
 from aldi.trainer import ALDITrainer
 import aldi.datasets # register datasets with Detectron2
@@ -33,7 +34,15 @@ import aldi.backbone # register ViT FPN backbone with Detectron2
 from aldi.split_datasets import split_train_data
 import aldi.datasets_benthic # register datasets with Detectron2
 import aldi.distill_saod
+from aldi.fcos.fcos import FCOS
+import aldi.fcos.align
+import aldi.fcos.distill
 
+import aldi.detr.align
+import aldi.detr.distill
+from PIL import Image, ImageFile
+ImageFile.LOAD_TRUNCATED_IMAGES = True
+from aldi.detr.helpers import add_deformable_detr_config
 
 def setup(args):
     """
@@ -43,6 +52,8 @@ def setup(args):
 
     ## Change here
     add_aldi_config(cfg)
+    add_fcos_config(cfg)
+    add_deformable_detr_config(cfg)
     ## End change
 
     cfg.merge_from_file(args.config_file)

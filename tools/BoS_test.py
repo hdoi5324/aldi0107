@@ -39,8 +39,14 @@ from detectron2.data.samplers import InferenceSampler
 from detectron2.evaluation import inference_on_dataset
 
 # Keep this so that datasets are loaded
+import aldi.datasets # register datasets with Detectron2
+import aldi.datasets_benthic # register datasets with Detectron2
+import aldi.distill_saod
+from aldi.fcos.fcos import FCOS
+import aldi.fcos.align
+import aldi.fcos.distill
 
-from model_selection.utils import perturb_by_dropout, build_evaluator, save_results_dict
+from model_selection.utils import perturb_by_dropout, build_evaluator, save_results_dict, setup
 from model_selection.model_selection import setup, load_model_weights
 from model_selection.fast_rcnn import fast_rcnn_inference_single_image_all_scores
 

@@ -1,6 +1,6 @@
 _BASE_: "./Base-RCNN-FPN-Sim10k_strongaug_ema.yaml"
 MODEL:
-  WEIGHTS: "outputs/sim10k/sim10k_baseline_strongaug_ema/cityscapes_cars_val_model_best.pth"
+  WEIGHTS: "outputs/sim10k/sim10k_baseline_strongaug_ema/cityscapes_cars_train_umsdas_ioukl_model_best.pth"
 EMA:
   ENABLED: True
 DATASETS:

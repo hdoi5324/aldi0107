@@ -11,10 +11,9 @@ EMA:
   ENABLED: True
 SOLVER:
   STEPS: (8999,) #
-  MAX_ITER: 9000 # 3 X 3000
+  MAX_ITER: 9001 # 3 X 3000
   CHECKPOINT_PERIOD: 1000
   IMS_PER_BATCH: 16
-  IMS_PER_GPU: 8
 LOGGING:
   TAGS: "Oracle,RCCN-FPN,StrongAugEMA"
-OUTPUT_DIR: "outputs/weakloose/urchin_oracle_strongaug_ema/"
+OUTPUT_DIR: "outputs/imosauv/urchin_oracle_strongaug_ema/"

@@ -3,8 +3,6 @@ MODEL:
   WEIGHTS: "models/R-50Imagenet_backboneonly.pkl" #R50 backbone trained on ImageNet from https://dl.fbaipublicfiles.com/detectron2/ImageNetPretrained/MSRA/R-50.pkl
   ROI_HEADS:
     NUM_CLASSES: 80
-INPUT:
-  MIN_SIZE_TRAIN: (800, 832, 864, 896, 928, 960, 992, 1024) #, 928, 960, 992, 1024)
 DATASETS:
   TRAIN: ("coco_sparse_easy",)
   TEST: ("coco_val",)
@@ -23,13 +21,13 @@ DOMAIN_ADAPT:
     HARD_OBJ_ENABLED: True
     HARD_RPN_REG_ENABLED: True
 SAOD:
-  LABELING_METHOD: "CoStudent" # or "CoStudent", "StudentTeacher"
+  LABELING_METHOD: "WeakTeacherWStrongStudentW" 
 SOLVER:
-  STEPS: (20000,30000,) # 
-  MAX_ITER: 40000 # 3 X 3000
+  STEPS: (48000,64000,) # 
+  MAX_ITER: 72000 
   CHECKPOINT_PERIOD: 5000
   WARMUP_ITERS: 1000
   WARMUP_FACTOR: 0.001
-OUTPUT_DIR: "outputs/coco/coco_costudent_sparse_easy/"
+OUTPUT_DIR: "outputs/coco/coco_saod_sparse_easy/"
 LOGGING:
   TAGS: "SAOD,RCCN-FPN"

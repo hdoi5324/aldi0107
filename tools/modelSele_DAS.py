@@ -15,6 +15,11 @@ from detectron2.data.samplers import InferenceSampler
 import aldi.datasets # register datasets with Detectron2
 import aldi.model # register ALDI R-CNN model with Detectron2
 import aldi.backbone # register ViT FPN backbone with Detectron2
+import aldi.datasets_benthic # register datasets with Detectron2
+import aldi.distill_saod
+from aldi.fcos.fcos import FCOS
+import aldi.fcos.align
+import aldi.fcos.distill
 
 # #from adapteacher.engine.trainer import ATeacherTrainer, BaselineTrainer
 
@@ -30,8 +35,8 @@ from PIL import Image
 
 import sys, os
 import time
-from model_selection.utils import save_results_dict
-from model_selection.model_selection import setup, load_model_weights
+from model_selection.utils import save_results_dict, setup
+from model_selection.model_selection import load_model_weights
 from modelSeleTools_DAS.methodsDirectory2Fast import *
 
 

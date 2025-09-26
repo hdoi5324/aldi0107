@@ -21,7 +21,7 @@ from aldi.dropin import DefaultTrainer, AMPTrainer, SimpleTrainer
 #from aldi.dataloader import SaveWeakDatasetMapper, UMTDatasetMapper, UnlabeledSaveWeakDatasetMapper, UnlabeledUMTDatasetMapper, WeakStrongDataloader
 from aldi.dataloader import SaveWeakDatasetMapper, UnlabeledDatasetMapper, WeakStrongDataloader
 from aldi.ema import EMA
-from aldi.evaluation import Detectron2COCOIOUEvaluatorAdapter
+from aldi.evaluation import Detectron2COCOIOUEvaluatorAdapter, Detectron2COCORecallEvaluatorAdapter
 from aldi.helpers import Detectron2COCOEvaluatorAdapter
 
 from aldi.model import build_aldi
@@ -176,14 +176,14 @@ class ALDITrainer(DefaultTrainer):
 
      @classmethod
      def build_evaluator(cls, cfg, dataset_name, output_folder=None):
-        """Just do COCO Evaluation."""
+        """Just do COCO Evaluation.  Extends results with recall metrics"""
         if output_folder is None:
             output_folder = os.path.join(cfg.OUTPUT_DIR, "inference")
-        return DatasetEvaluators([Detectron2COCOEvaluatorAdapter(dataset_name, output_dir=output_folder)])
+        return DatasetEvaluators([Detectron2COCORecallEvaluatorAdapter(dataset_name, output_dir=output_folder)])
 
      @classmethod
      def build_iou_evaluator(cls, cfg, dataset_name, output_folder=None):
-        """Just do COCO Evaluation."""
+        """Does COCO evaluation to calculate AP25."""
         if output_folder is None:
             output_folder = os.path.join(cfg.OUTPUT_DIR, "inference")
         return DatasetEvaluators([Detectron2COCOIOUEvaluatorAdapter(dataset_name, output_dir=output_folder)])
@@ -223,7 +223,7 @@ class ALDITrainer(DefaultTrainer):
                     ret.insert(-1, BestCheckpointer(self.cfg.UMS.CHECKPOINT_PERIOD, self.checkpointer,
                                                     f"umsdas/ioukl", "max", file_prefix=f"{self.cfg.UMS.UNLABELED}_umsdas_ioukl_model_best"))                 
                     ret.insert(-1, BestCheckpointer(self.cfg.UMS.CHECKPOINT_PERIOD, self.checkpointer,
-                                                    f"umsdropout/ioukl_kl", "max", file_prefix=f"{self.cfg.UMS.UNLABELED}_umsdropout_ioukl_kl_model_best"))                 
+                                                    f"ums_5/ioukl", "max", file_prefix=f"{self.cfg.UMS.UNLABELED}_ums_5/ioukl_ioukl_model_best"))                 
                else:
                     ret.append(ums_eval_hook)
           ## END UMS hooks
@@ -235,10 +235,10 @@ class ALDITrainer(DefaultTrainer):
           """
           - Enable use of alternative optimizers (e.g. AdamW for ViTDet)
           """
-          if cfg.SOLVER.OPTIMIZER.upper() == "SGD":
+          if cfg.SOLVER.OPTIMIZER is None or cfg.SOLVER.OPTIMIZER.upper() == "SGD":
                return super(ALDITrainer, cls).build_optimizer(cfg, model)
-          elif cfg.SOLVER.OPTIMIZER.upper() == "ADAMW" and cfg.MODEL.BACKBONE.NAME == "build_vitdet_b_backbone":
-               return get_adamw_optim(model, include_vit_lr_decay=True)
+          elif cfg.SOLVER.OPTIMIZER.upper() == "ADAMW":
+               return get_adamw_optim(model, include_vit_lr_decay=cfg.MODEL.BACKBONE.NAME == "build_vitdet_b_backbone")
           else:
                raise ValueError(f"Unsupported optimizer/backbone combination {cfg.SOLVER.OPTIMIZER} {cfg.MODEL.BACKBONE.NAME}.")
 

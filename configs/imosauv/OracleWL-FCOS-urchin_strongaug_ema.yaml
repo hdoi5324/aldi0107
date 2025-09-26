@@ -1,0 +1,19 @@
+_BASE_: "../Base-FCOS.yaml"
+MODEL:
+  FCOS:
+    NUM_CLASSES: 1
+DATASETS:
+  TRAIN: ("squidle_urchin_train",)
+  TEST: ("squidle_urchin_test",)
+  BATCH_CONTENTS: ("labeled_strong", )
+EMA:
+  ENABLED: True
+SOLVER:
+  STEPS: (6000, 8000,) #
+  MAX_ITER: 9001 # 3 X 3000
+  CHECKPOINT_PERIOD: 1000
+  IMS_PER_BATCH: 16
+  BASE_LR: 0.01
+LOGGING:
+  TAGS: "Oracle,FCOS,StrongAugEMA"
+OUTPUT_DIR: "outputs/imosauv/urchin_oracle_fcos_strongaug_ema/"

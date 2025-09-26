@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH --account=nn10058k --job-name=benthic_daod  # create a short name for your job
-#SBATCH --partition=a100 --gpus=2
+#SBATCH --partition=accel --gpus=1
 #SBATCH --time=2:0:0
 #SBATCH --nodes=1                # node count
 #SBATCH --ntasks-per-node=1      # total number of tasks per node
@@ -40,6 +40,7 @@ export CUDA_VISIBLE_DEVICES="0"
 # setup module system
 module --quiet purge
 module load Anaconda3/2022.10
+module load PyTorch/1.12.0-foss-2022a-CUDA-11.7.0
 source ${EBROOTANACONDA3}/bin/activate
 
 export CONDA_PKGS_DIRS=/cluster/projects/nn10058k/hdoi5324_daod/conda/package-cache
@@ -47,13 +48,13 @@ echo -n ${CONDA_PKGS_DIRS}
 
 CONDA_ENV="/cluster/projects/nn10058k/hdoi5324_daod/conda/py310_torch"
 
-conda create --prefix ${CONDA_ENV}  python=3.10 -y
+#conda create --prefix ${CONDA_ENV}  python=3.10 -y
 
 conda activate ${CONDA_ENV}
 echo -n "Activated env"
 echo -n "***"
 
-conda install pytorch torchvision pytorch-cuda=11.8 -c pytorch -c nvidia -y 
+pip install torch==2.7.1 torchvision==0.22.1 torchaudio==2.7.1 --index-url https://download.pytorch.org/whl/cu11
 echo "***"
 echo -n "Installed torch"
 
@@ -65,5 +66,7 @@ python -m pip install 'git+https://github.com/facebookresearch/detectron2.git'
 echo "****"
 echo -n "Installed detectron2"
 
-conda install -c conda-forge neptune-detectron2 -y
+pip install neptune-detectron2 
 echo -n "Finished"
+
+pip install -e .

@@ -139,3 +139,4 @@ register_coco_instances("coco_sparse_hard", {}, "datasets/coco/annotations/insta
 register_coco_instances("coco_sparse_extreme", {}, "datasets/coco/annotations/instances_train2017_extreme.json", "datasets/coco/train2017")
 register_coco_instances("coco_sparse_keep1", {}, "datasets/coco/annotations/keep1_instances_train2017.json", "datasets/coco/train2017")
 
+register_coco_instances("squidle_yellowball_test", {}, "datasets/squidle_coco/squidle_yellowball_test/annotations/instances_test.json", "datasets/squidle_coco/squidle_yellowball_test/test2023")

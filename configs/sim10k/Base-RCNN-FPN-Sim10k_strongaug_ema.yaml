@@ -7,13 +7,13 @@ DATASETS:
   TEST: ("cityscapes_cars_val",)
   BATCH_CONTENTS: ("labeled_strong", )
 UMS:
-  UNLABELED: "cityscapes_cars_val"
+  UNLABELED: "cityscapes_cars_train"
 EMA:
   ENABLED: True
 SOLVER:
   CHECKPOINT_PERIOD: 1000
 TEST:
-  EVAL_PERIOD: 100
+  EVAL_PERIOD: 500
 OUTPUT_DIR: "outputs/sim10k/sim10k_baseline_strongaug_ema/"
 LOGGING:
   TAGS: "Base,RCCN-FPN,StrongAugEMA"

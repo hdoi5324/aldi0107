@@ -1,11 +1,11 @@
 import torch
 from torch.nn.parallel import DistributedDataParallel as DDP
 
+from model_selection.utils import _bbox_overlaps as bbox_overlaps
 from detectron2.structures import Boxes, pairwise_iou
 from aldi.pseudolabeler import process_pseudo_label
 from aldi.gaussian_rcnn.instances import FreeInstances as Instances 
-from model_selection.utils import _bbox_overlaps as bbox_overlaps
-
+from aldi.detr.libs.DeformableDETRDetectron2.meta_arch import DeformableDETR
 
 class SparseStudentTeacherPseudoLabeler:
     def __init__(self, teacher_model, student_model, threshold, threshold_method, labeling_method="TeacherPred", 
@@ -228,8 +228,12 @@ def sparse_weak_teacherw_strong_studentw_pseudo_label_inplacev3(teacher_model, s
     was_student_training = student_model.training
     student_model.eval()
 
-    teacher_preds = detach_predictions(teacher_model.inference([{"image": item['image'].detach().clone()} for item in labeled_weak], do_postprocess=False)) #todo: try copying labeled_weak
-    student_weak_preds = detach_predictions(student_model.inference([{"image": item['image'].detach().clone()} for item in labeled_weak], do_postprocess=False))
+    if isinstance(teacher_model, DeformableDETR):
+        teacher_preds = detach_predictions([i['instances'] for i in teacher_model([{"image": item['image'].detach().clone()} for item in labeled_weak])])#todo: try copying labeled_weak
+        student_weak_preds = detach_predictions([i['instances'] for i in student_model([{"image": item['image'].detach().clone()} for item in labeled_weak])])
+    else:
+        teacher_preds = detach_predictions(teacher_model.inference([{"image": item['image'].detach().clone()} for item in labeled_weak], do_postprocess=False)) #todo: try copying labeled_weak
+        student_weak_preds = detach_predictions(student_model.inference([{"image": item['image'].detach().clone()} for item in labeled_weak], do_postprocess=False))
 
     if was_teacher_training: teacher_model.train()    
     if was_student_training: student_model.train()
