@@ -1,0 +1,19 @@
+_BASE_: "../Base-RCNN-FPN.yaml"
+MODEL:
+  ROI_HEADS:
+    NUM_CLASSES: 1
+DATASETS:
+  TRAIN: ("squidle_urchin_2009_train","squidle_east_tas_urchins_train",)
+  TEST: ("UDD_test",) #("squidle_urchin_2011_test","UDD_test",)
+  BATCH_CONTENTS: ("labeled_strong", )
+UMS:
+  UNLABELED: "UDD_test"
+EMA:
+  ENABLED: True
+SOLVER:
+  STEPS: (8999,) # 
+  MAX_ITER: 9000 # 3 X 3000
+  CHECKPOINT_PERIOD: 1000
+LOGGING:
+  TAGS: "Base,RCCN-FPN,StrongAugEMA"
+OUTPUT_DIR: "outputs/imosauv/imosauv_baseline_strongaug_ema/"

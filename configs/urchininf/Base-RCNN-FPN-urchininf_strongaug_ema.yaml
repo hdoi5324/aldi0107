@@ -1,0 +1,7 @@
+_BASE_: "Base-urchininf-data.yaml"
+DATASETS:
+  BATCH_CONTENTS: ("labeled_strong", )
+EMA:
+  ENABLED: True
+LOGGING:
+  TAGS: "Base,RCCN-FPN,StrongAugEMA"

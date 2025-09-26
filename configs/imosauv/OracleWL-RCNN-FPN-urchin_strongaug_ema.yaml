@@ -1,0 +1,19 @@
+_BASE_: "../Base-RCNN-FPN.yaml"
+MODEL:
+  #WEIGHTS: "/home/heather/GitHub/aldi/outputs/redcup/redcup_baseline_strongaug_ema/model_final.pth"
+  ROI_HEADS:
+    NUM_CLASSES: 1
+DATASETS:
+  TRAIN: ("squidle_urchin_train",)
+  TEST: ("squidle_urchin_2011_test",)
+  BATCH_CONTENTS: ("labeled_strong", )
+EMA:
+  ENABLED: True
+SOLVER:
+  STEPS: (8999,) #
+  MAX_ITER: 9001 # 3 X 3000
+  CHECKPOINT_PERIOD: 1000
+  IMS_PER_BATCH: 16
+LOGGING:
+  TAGS: "Oracle,RCCN-FPN,StrongAugEMA"
+OUTPUT_DIR: "outputs/imosauv/urchin_oracle_strongaug_ema/"

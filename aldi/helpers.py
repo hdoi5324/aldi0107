@@ -9,7 +9,7 @@ class SaveIO:
     def __init__(self):
         self.input = None
         self.output = None
-        
+
     def __call__(self, module, module_in, module_out):
         self.input = module_in
         self.output = module_out
@@ -79,3 +79,5 @@ class Detectron2COCOEvaluatorAdapter(COCOEvaluator):
     ):
         super().__init__(dataset_name, output_dir=output_dir, distributed=distributed)
         _maybe_add_optional_annotations(self._coco_api)
+        
+        

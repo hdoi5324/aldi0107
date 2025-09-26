@@ -1,0 +1,8 @@
+_BASE_: "./ALDI-VitDetB-urchininf.yaml"
+MODEL:
+  WEIGHTS: "outputs/urchininf/base_vitdetb_strongaug_ema_inf_sq/model_final.pth" 
+DATASETS:
+  UNLABELED: ("squidle_urchin_2009_train","squidle_east_tas_urchins_train",)
+  TEST: ("squidle_urchin_2011_test",)
+MODEL:
+  WEIGHTS: "outputs/urchininf/base_strongaug_ema_inf_sq/model_final.pth"  

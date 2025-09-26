@@ -1,5 +1,5 @@
 from typing import Any, Dict
-
+import torch
 from fvcore.common.checkpoint import _IncompatibleKeys
 from detectron2.checkpoint.detection_checkpoint import DetectionCheckpointer
 from detectron2.checkpoint.c2_model_loading import align_and_update_state_dicts
@@ -18,11 +18,13 @@ class DetectionCheckpointerWithEMA(DetectionCheckpointer):
     def resume_or_load(self, path: str, *, resume: bool = True) -> Dict[str, Any]:
         ret = super().resume_or_load(path, resume=resume)
         if (not resume) and path.endswith(".pth") and "ema" in ret.keys():
-            self.logger.info("Loading EMA weights as model starting point.")
+            self.logger.info("aldi.checkpoint: Loading EMA weights as model starting point.")
             ema_dict = {
                 k.replace('model.',''): v for k, v in ret['ema'].items()
             }
-            incompatible = self.model.load_state_dict(ema_dict, strict=False)
+            #incompatible = self.model.load_state_dict(ema_dict, strict=False)
+            ret['model'] = ema_dict
+            incompatible = self._load_model(ret)
             if incompatible is not None:
                 self._log_incompatible_keys(_IncompatibleKeys(
                     missing_keys=incompatible.missing_keys,

@@ -1,4 +1,4 @@
-_BASE_: "./Base-RCNN-FPN-Sim10k_strongaug_ema"
+_BASE_: "./Base-RCNN-FPN-Sim10k_strongaug_ema.yaml"
 MODEL:
   WEIGHTS: "models/sim10k_baseline_strongaug_ema_cityscapes_cars_val_model_best_768.pth"
 EMA:

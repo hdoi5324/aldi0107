@@ -11,6 +11,8 @@ import time
 import torch
 import copy
 import numpy as np
+import random
+
 
 from detectron2.checkpoint import DetectionCheckpointer
 from detectron2.data.dataset_mapper import DatasetMapper as _DatasetMapper
@@ -50,7 +52,7 @@ class DefaultTrainer(_DefaultTrainer):
             data_loader = self.build_train_loader(cfg)
 
             ### Change is here ###
-            model = self.create_ddp_model(model, broadcast_buffers=False, cfg=cfg)
+            model = self.create_ddp_model(model, broadcast_buffers=False, cfg=cfg, find_unused_parameters=cfg.MODEL.FIND_UNUSED_PARAMETERS)
             ###   End change   ###
 
             ## Change is here ##
@@ -81,8 +83,8 @@ class DefaultTrainer(_DefaultTrainer):
                 trainer=weakref.proxy(self),
             )
 
-    def create_ddp_model(self, model, broadcast_buffers, cfg):
-        return create_ddp_model(model, broadcast_buffers=broadcast_buffers)
+    def create_ddp_model(self, model, broadcast_buffers, cfg, find_unused_parameters):
+        return create_ddp_model(model, broadcast_buffers=broadcast_buffers, find_unused_parameters=find_unused_parameters)
     
 class SimpleTrainer(_SimpleTrainer):
     """
@@ -139,7 +141,7 @@ class AMPTrainer(_AMPTrainer):
         """
         assert self.model.training, "[AMPTrainer] model was changed to eval mode!"
         assert torch.cuda.is_available(), "[AMPTrainer] CUDA is required for AMP training!"
-        from torch.cuda.amp import autocast
+        from torch.amp import autocast
 
         start = time.perf_counter()
         data = next(self._data_loader_iter)
@@ -147,7 +149,7 @@ class AMPTrainer(_AMPTrainer):
 
         if self.zero_grad_before_forward:
             self.optimizer.zero_grad()
-        with autocast(dtype=self.precision):
+        with autocast("cuda", dtype=self.precision):
             
             ## Change is here ##
             loss_dict = self.run_model(data)
@@ -220,6 +222,6 @@ class DatasetMapper(_DatasetMapper):
         ##   End change   ##
 
         return dataset_dict
-    
+
     def _after_call(self, dataset_dict, aug_input):
         return dataset_dict

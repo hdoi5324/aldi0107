@@ -1,0 +1,17 @@
+_BASE_: "../Base-RCNN-FPN-urchininf_strongaug_ema.yaml"
+MODEL:
+  FIND_UNUSED_PARAMETERS: True
+  WEIGHTS: "outputs/urchininf/base_strongaug_ema_inf_udd/model_final.pth"  #urchininf_base_strongaug_ema
+EMA:
+  ENABLED: False
+DOMAIN_ADAPT:
+  ALIGN:
+    SADA_ENABLED: True
+    IMG_DA_WEIGHT: 0.005
+DATASETS:
+  UNLABELED: ("UDD_train",)
+  BATCH_CONTENTS: ("labeled_weak","unlabeled_weak")
+  BATCH_RATIOS: (1,1)
+OUTPUT_DIR: "outputs/urchininf/urchininf_SADA/"
+LOGGING:
+  TAGS: "RCCN-FPN,SADA"

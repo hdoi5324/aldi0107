@@ -165,3 +165,8 @@ cython_debug/
 #.idea/
 
 .vscode
+/execute_all.out
+/outputs/
+/.neptune/
+/groundtruths/
+/detections/

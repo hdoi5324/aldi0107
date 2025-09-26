@@ -13,6 +13,8 @@ import matplotlib.pyplot as plt
 from detectron2.config import get_cfg
 from detectron2.engine import default_argument_parser, default_setup, launch
 from detectron2.evaluation import inference_on_dataset
+from detectron2.data.build import build_detection_train_loader, get_detection_dataset_dicts, build_detection_test_loader
+from aldi.dropin import DatasetMapper
 
 from aldi.checkpoint import DetectionCheckpointerWithEMA
 from aldi.config import add_aldi_config
@@ -87,7 +89,14 @@ def main(args):
         roi_heads_hook_handle = model.roi_heads.box_pooler.register_forward_hook(lambda module, input, output: proposal_level_features[dataset_name].extend(pooling_method(output, kernel_size=output.shape[2:4])[..., 0, 0].detach().cpu().numpy()))
 
         # iterate over single dataset
-        data_loader = ALDITrainer.build_test_loader(cfg, dataset_name)
+        n = 10
+        dataset = get_detection_dataset_dicts(dataset_name,
+                                                      filter_empty=False)
+        if len(dataset) > n:
+            dataset = dataset[:n]
+
+        data_loader = build_detection_test_loader(dataset, mapper=DatasetMapper(cfg, is_train=False))
+        #data_loader = ALDITrainer.build_test_loader(cfg, dataset)
         inference_on_dataset(model, data_loader, evaluator=None)
         
         # clean up hooks

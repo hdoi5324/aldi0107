@@ -1,6 +1,8 @@
 import os
 import copy
 import logging
+
+from matplotlib.transforms import nonsingular
 from torch.nn.parallel import DistributedDataParallel as DDP
 
 from detectron2.checkpoint.detection_checkpoint import DetectionCheckpointer
@@ -16,14 +18,17 @@ from aldi.backbone import get_adamw_optim
 from aldi.checkpoint import DetectionCheckpointerWithEMA
 from aldi.distill import build_distiller
 from aldi.dropin import DefaultTrainer, AMPTrainer, SimpleTrainer
+#from aldi.dataloader import SaveWeakDatasetMapper, UMTDatasetMapper, UnlabeledSaveWeakDatasetMapper, UnlabeledUMTDatasetMapper, WeakStrongDataloader
 from aldi.dataloader import SaveWeakDatasetMapper, UnlabeledDatasetMapper, WeakStrongDataloader
 from aldi.ema import EMA
+from aldi.evaluation import Detectron2COCOIOUEvaluatorAdapter, Detectron2COCORecallEvaluatorAdapter
 from aldi.helpers import Detectron2COCOEvaluatorAdapter
+
 from aldi.model import build_aldi
 
 DEBUG = False
 debug_dict = {}
-
+logger = logging.getLogger("detectron2")
 
 def run_model_labeled_unlabeled(trainer, labeled_weak, labeled_strong, unlabeled_weak, unlabeled_strong):
      """
@@ -43,9 +48,10 @@ def run_model_labeled_unlabeled(trainer, labeled_weak, labeled_strong, unlabeled
      model_batch_size = trainer.model_batch_size # TODO this could be None
 
      _model = model.module if type(model) == DDP else model
-     do_weak = labeled_weak is not None
-     do_strong = labeled_strong is not None
-     do_align = any( [ getattr(_model, a, None) is not None for a in ["img_align", "ins_align"] ] )
+     is_sparse = "Sparse" in str(type(trainer.distiller))
+     do_weak = labeled_weak is not None and not is_sparse #todo: find better way to do this
+     do_strong = labeled_strong is not None and not is_sparse 
+     do_align = any( [ getattr(_model, a, None) is not None for a in ["img_align", "ins_align", "sada_heads"] ] )
      do_distill = trainer.distiller.distill_enabled()
 
      total_batch_size = sum([len(s or []) for s in [labeled_weak, labeled_strong, unlabeled_weak]])
@@ -67,7 +73,7 @@ def run_model_labeled_unlabeled(trainer, labeled_weak, labeled_strong, unlabeled
           """
           for k, v in losses.items():
                if key_conditional(k):
-                    v /= num_grad_accum_steps
+                    v = v / num_grad_accum_steps
                     if not backward_at_end: 
                          v = v.detach()
                     loss_dict[f"{k}_{suffix}"] = loss_dict.get(f"{k}_{suffix}", 0) + v
@@ -110,7 +116,10 @@ def run_model_labeled_unlabeled(trainer, labeled_weak, labeled_strong, unlabeled
 
      # Distillation losses
      if do_distill:
-          do_distill_step(unlabeled_weak, unlabeled_strong, "distill", lambda k: k != "_")
+          if is_sparse:
+               do_distill_step(labeled_weak, labeled_strong, "distill", lambda k: k != "_")
+          else:
+               do_distill_step(unlabeled_weak, unlabeled_strong, "distill", lambda k: k != "_")
           if DEBUG: 
             debug_dict['last_pseudolabeled'] = copy.deepcopy(unlabeled_strong)
 
@@ -120,11 +129,12 @@ def run_model_labeled_unlabeled(trainer, labeled_weak, labeled_strong, unlabeled
 # Extend both Detectron2's AMPTrainer and SimpleTrainer classes with DA capabilities
 # Used by DATrainer below in the same way DefaultTrainer uses the original AMP and Simple Trainers
 class _ALDITrainer:
-     def __init__(self, model, data_loader, optimizer, distiller, backward_at_end=True, model_batch_size=None):
+     def __init__(self, model, data_loader, optimizer, distiller, backward_at_end=True, model_batch_size=None, batch_size=None):
           super().__init__(model, data_loader, optimizer, zero_grad_before_forward=not backward_at_end)
           self.distiller = distiller
           self.backward_at_end = backward_at_end
           self.model_batch_size = model_batch_size
+          self.batch_size = batch_size
 
      def run_model(self, data):
           return run_model_labeled_unlabeled(self, *data)
@@ -145,7 +155,8 @@ class ALDITrainer(DefaultTrainer):
           distiller = build_distiller(cfg=cfg, teacher=self.ema.model if cfg.EMA.ENABLED else model, student=model)
           trainer = (ALDIAMPTrainer if cfg.SOLVER.AMP.ENABLED else ALDISimpleTrainer)(model, data_loader, optimizer, distiller,
                                                                                   backward_at_end=cfg.SOLVER.BACKWARD_AT_END,
-                                                                                  model_batch_size=cfg.SOLVER.IMS_PER_GPU)
+                                                                                  model_batch_size=cfg.SOLVER.IMS_PER_GPU,
+                                                                                      batch_size=cfg.SOLVER.IMS_PER_BATCH)
           return trainer
      
      def _create_checkpointer(self, model, cfg):
@@ -158,23 +169,31 @@ class ALDITrainer(DefaultTrainer):
      @classmethod
      def build_model(cls, cfg):
           model = build_aldi(cfg)
-          logger = logging.getLogger(__name__)
-          logger.info("Model:\n{}".format(model))
-          print(model) # TODO: Not sure why logging not working
+          logger = logging.getLogger("detectron2")
+          logger.info("aldi.trainer: Model:\n{}".format(model))
+          #print(model) # TODO: Not sure why logging not working
           return model
 
      @classmethod
      def build_evaluator(cls, cfg, dataset_name, output_folder=None):
-        """Just do COCO Evaluation."""
+        """Just do COCO Evaluation.  Extends results with recall metrics"""
         if output_folder is None:
             output_folder = os.path.join(cfg.OUTPUT_DIR, "inference")
-        return DatasetEvaluators([Detectron2COCOEvaluatorAdapter(dataset_name, output_dir=output_folder)])
+        return DatasetEvaluators([Detectron2COCORecallEvaluatorAdapter(dataset_name, output_dir=output_folder)])
 
+     @classmethod
+     def build_iou_evaluator(cls, cfg, dataset_name, output_folder=None):
+        """Does COCO evaluation to calculate AP25."""
+        if output_folder is None:
+            output_folder = os.path.join(cfg.OUTPUT_DIR, "inference")
+        return DatasetEvaluators([Detectron2COCOIOUEvaluatorAdapter(dataset_name, output_dir=output_folder)])
+     
      def build_hooks(self):
           ret = super(ALDITrainer, self).build_hooks()
 
           # add hooks to evaluate/save teacher model if applicable
           if self.cfg.EMA.ENABLED:
+               #todo: add some flag so that ema evaluation saves separately to student
                def test_and_save_results_ema():
                     self._last_eval_results = self.test(self.cfg, self.ema.model)
                     return self._last_eval_results
@@ -193,6 +212,22 @@ class ALDITrainer(DefaultTrainer):
                     for test_set in self.cfg.DATASETS.TEST:
                          ret.insert(-1, BestCheckpointer(self.cfg.TEST.EVAL_PERIOD, self.checkpointer,
                                                     f"{test_set}/bbox/AP50", "max", file_prefix=f"{test_set}_model_best"))
+                      
+          ## CHANGE Add EvalHook and BestCheckpointer hook to capture UMS measures
+          if self.cfg.UMS.UNLABELED is not None:
+               #todo: cater for multiple unlabeled datasets
+               from model_selection.ums import test_ums
+               ums_eval_hook = hooks.EvalHook(self.cfg.UMS.CHECKPOINT_PERIOD, lambda: test_ums(self.cfg, self.ema.model))
+               if comm.is_main_process():
+                    ret.insert(-1, ums_eval_hook) # before PeriodicWriter if in main process
+                    ret.insert(-1, BestCheckpointer(self.cfg.UMS.CHECKPOINT_PERIOD, self.checkpointer,
+                                                    f"umsdas/ioukl", "max", file_prefix=f"{self.cfg.UMS.UNLABELED}_umsdas_ioukl_model_best"))                 
+                    ret.insert(-1, BestCheckpointer(self.cfg.UMS.CHECKPOINT_PERIOD, self.checkpointer,
+                                                    f"ums_5/ioukl", "max", file_prefix=f"{self.cfg.UMS.UNLABELED}_ums_5/ioukl_ioukl_model_best"))                 
+               else:
+                    ret.append(ums_eval_hook)
+          ## END UMS hooks
+         
           return ret
      
      @classmethod
@@ -200,10 +235,10 @@ class ALDITrainer(DefaultTrainer):
           """
           - Enable use of alternative optimizers (e.g. AdamW for ViTDet)
           """
-          if cfg.SOLVER.OPTIMIZER.upper() == "SGD":
+          if cfg.SOLVER.OPTIMIZER is None or cfg.SOLVER.OPTIMIZER.upper() == "SGD":
                return super(ALDITrainer, cls).build_optimizer(cfg, model)
-          elif cfg.SOLVER.OPTIMIZER.upper() == "ADAMW" and cfg.MODEL.BACKBONE.NAME == "build_vitdet_b_backbone":
-               return get_adamw_optim(model, include_vit_lr_decay=True)
+          elif cfg.SOLVER.OPTIMIZER.upper() == "ADAMW":
+               return get_adamw_optim(model, include_vit_lr_decay=cfg.MODEL.BACKBONE.NAME == "build_vitdet_b_backbone")
           else:
                raise ValueError(f"Unsupported optimizer/backbone combination {cfg.SOLVER.OPTIMIZER} {cfg.MODEL.BACKBONE.NAME}.")
 
@@ -220,19 +255,25 @@ class ALDITrainer(DefaultTrainer):
           labeled_bs = max(labeled_bs) if len(labeled_bs) else 0
           unlabeled_bs = [batch_sizes[i] for i in range(len(batch_contents)) if batch_contents[i].startswith("unlabeled")]
           unlabeled_bs = max(unlabeled_bs) if len(unlabeled_bs) else 0
-
+          
           # create labeled dataloader
           labeled_loader = None
           if labeled_bs > 0 and len(cfg.DATASETS.TRAIN):
-               labeled_loader = build_detection_train_loader(get_detection_dataset_dicts(cfg.DATASETS.TRAIN, filter_empty=cfg.DATALOADER.FILTER_EMPTY_ANNOTATIONS), 
+               labeled_dataset = get_detection_dataset_dicts(cfg.DATASETS.TRAIN, filter_empty=cfg.DATALOADER.FILTER_EMPTY_ANNOTATIONS)
+               if len(labeled_dataset) > cfg.DATASETS.TRAIN_SIZE:
+                    labeled_dataset = labeled_dataset[:cfg.DATASETS.TRAIN_SIZE]
+                    logger = logging.getLogger("detectron2")
+                    logger.info("aldi.trainer: Reducing dataset size!!! : Dataset size is now {} with {} annotations".format(len(labeled_dataset), sum([len(img['annotations']) for img in labeled_dataset])))
+               #labeled_loader = build_detection_train_loader(get_detection_dataset_dicts(cfg.DATASETS.TRAIN, filter_empty=cfg.DATALOADER.FILTER_EMPTY_ANNOTATIONS),                    
+               labeled_loader = build_detection_train_loader(labeled_dataset, 
                     mapper=SaveWeakDatasetMapper(cfg, is_train=True, augmentations=get_augs(cfg, labeled=True, include_strong_augs="labeled_strong" in batch_contents)),
-                    num_workers=cfg.DATALOADER.NUM_WORKERS, 
+                    num_workers=cfg.DATALOADER.NUM_WORKERS,
                     total_batch_size=labeled_bs)
 
           # create unlabeled dataloader
           unlabeled_loader = None
           if unlabeled_bs > 0 and len(cfg.DATASETS.UNLABELED):
-               unlabeled_loader = build_detection_train_loader(get_detection_dataset_dicts(cfg.DATASETS.UNLABELED, filter_empty=cfg.DATALOADER.FILTER_EMPTY_ANNOTATIONS), 
+               unlabeled_loader = build_detection_train_loader(get_detection_dataset_dicts(cfg.DATASETS.UNLABELED, filter_empty=cfg.DATALOADER.FILTER_UNLABELED_EMPTY_ANNOTATIONS),
                     mapper=UnlabeledDatasetMapper(cfg, is_train=True, augmentations=get_augs(cfg, labeled=False, include_strong_augs="unlabeled_strong" in batch_contents)),
                     num_workers=cfg.DATALOADER.NUM_WORKERS,
                     total_batch_size=unlabeled_bs)
