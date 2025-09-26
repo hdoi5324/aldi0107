@@ -1,0 +1,3 @@
+[submodule "aldi/detr/libs/DeformableDETRDetectron2"]
+	path = aldi/detr/libs/DeformableDETRDetectron2
+	url = https://github.com/justinkay/Deformable-DETR-Detectron2.git
