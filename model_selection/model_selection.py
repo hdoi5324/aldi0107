@@ -16,24 +16,28 @@ from scipy.optimize import linear_sum_assignment
 
 import torch.nn.functional as F
 from detectron2.modeling import GeneralizedRCNN
-from detectron2.data.build import filter_images_with_only_crowd_annotations, build_detection_train_loader, build_detection_test_loader
+from detectron2.data.build import filter_images_with_only_crowd_annotations, build_detection_test_loader
 from detectron2.data.samplers import InferenceSampler
 from detectron2.data.catalog import DatasetCatalog, MetadataCatalog
 from detectron2.data.datasets import load_coco_json, register_coco_instances
 from detectron2.data.dataset_mapper import DatasetMapper
-from detectron2.engine import DefaultTrainer, PeriodicWriter, SimpleTrainer, HookBase, hooks
+from detectron2.engine import DefaultTrainer, default_setup
 from detectron2.modeling import build_model
 from detectron2.utils.logger import log_every_n_seconds, _log_api_usage
 from fvcore.nn.giou_loss import giou_loss
 
-from detectron2.utils.events import EventStorage, get_event_storage
+from detectron2.utils.events import EventStorage
 from detectron2.structures import pairwise_iou, Boxes, BoxMode
+from detectron2.evaluation.testing import flatten_results_dict
+
+from aldi.config import add_aldi_config
+from aldi.config_aldi_only import add_aldi_only_config
 
 #from aldi.config import add_aldi_config
 #from aldi.methodsDirectory2Fast import perturb_by_dropout, dropout_masks
 
-from model_selection.utils import get_model_shortname, load_model_weights, build_evaluator, perturb_by_dropout, dropout_masks
-from modelSeleTools_DAS.methodsDirectory2Fast import perturb_model_parameters
+from model_selection.ums import UMS, perturb_model_parameters
+from model_selection.utils import build_evaluator, perturb_by_dropout, dropout_masks
 
 # Override box_loss methods to use mean
 from .box_loss import _mean_dense_box_regression_loss, classifier_loss_on_gt_boxes, get_outputs_with_image_id
@@ -42,7 +46,7 @@ setattr(current_module, '_dense_box_regression_loss', _mean_dense_box_regression
 current_module = sys.modules['detectron2.modeling.roi_heads.fast_rcnn']
 setattr(current_module, '_dense_box_regression_loss', _mean_dense_box_regression_loss)
 
-from modelSeleTools_DAS.fast_rcnn import fast_rcnn_inference_single_image_all_scores
+from model_selection.fast_rcnn import fast_rcnn_inference_single_image_all_scores
 
 DEBUG = False
 debug_dict = {}
@@ -50,11 +54,7 @@ logger = logging.getLogger("detectron2")
 
 
 class ModelSelection:
-    def __init__(self, cfg, source_ds=[], target_ds=None, gather_metric_period=1):
-        self._hooks: List[HookBase] = []
-        self.iter: int = 0
-        self.start_iter: int = 0
-        self.max_iter: int
+    def __init__(self, cfg, source_ds=[], target_ds=None):
         self.storage: EventStorage
         
         _log_api_usage("trainer." + self.__class__.__name__)    
@@ -65,12 +65,6 @@ class ModelSelection:
         self.model.eval()
         self.perturb_method = perturb_by_dropout if cfg.MODEL_SELECTION.PERTURB_TYPE == "dropout" else perturb_model_parameters
 
-        # Calculate dropout_masks so they can be used consistently throughout experiments
-        if cfg.MODEL_SELECTION.PERTURB_TYPE == "dropout":
-            self.perturbation_masks = [dropout_masks(self.model, p=cfg.MODEL_SELECTION.DROPOUT) for _ in range(cfg.MODEL_SELECTION.N_PERTURBATIONS)]
-        else:
-            self.perturbation_masks = None
-
         if cfg.MODEL_SELECTION.N_TRANSFORMED_SOURCE > 0:
             new_source_ds = []
             for i in range(cfg.MODEL_SELECTION.N_TRANSFORMED_SOURCE):
@@ -80,29 +74,9 @@ class ModelSelection:
         self.sampled_src = get_dataset_samples(source_ds, n=cfg.MODEL_SELECTION.N_SAMPLE) if source_ds is not None else []
         #self.sampled_src = self.sampled_src[:min(len(self.sampled_src), 6)]
         self.sampled_tgt = get_dataset_samples(target_ds, n=1000000) if target_ds is not None else [] # Use all target data
-
         self.evaluation_dir = os.path.join(cfg.OUTPUT_DIR, "model_selection")
-        self.gather_metric_period = gather_metric_period
   
         
-    def _write_metrics(
-        self,
-        loss_dict: Mapping[str, torch.Tensor],
-        data_time: float,
-        prefix: str = "",
-        iter: Optional[int] = None,
-    ) -> None:
-        #logger = logging.getLogger(__name__)
-
-        iter = self.iter if iter is None else iter
-        if (iter + 1) % self.gather_metric_period == 0:
-            try:
-                SimpleTrainer.write_metrics(loss_dict, data_time, iter, prefix)
-                self.storage.step()
-            except Exception:
-                logger.exception("Exception in writing metrics: ")
-                raise
-
     def run_model_selection(self, model_weights, source=True, neptune_run=None):
         from detectron2.modeling.roi_heads import fast_rcnn 
         fast_rcnn.fast_rcnn_inference_single_image = fast_rcnn_inference_single_image_all_scores
@@ -127,6 +101,7 @@ class ModelSelection:
             # og_test_dataset = DatasetCatalog.get(dataset_name)
             
             ### A) Generate Pseudo label for baseline for loss with perturbed model
+            # ums_calculator = UMS(
             from detectron2.modeling.roi_heads import fast_rcnn 
             fast_rcnn.fast_rcnn_inference_single_image = fast_rcnn_inference_single_image_all_scores
             evaluator = build_evaluator(cfg, dataset_name, self.evaluation_dir, do_eval=True)
@@ -190,11 +165,6 @@ class ModelSelection:
             # Average perturbed losses
             losses_perturbed = {k: (float(np.average(v)), float(np.std(v))) for k, v in losses_perturbed.items() if
                                 "loss" in k}
-
-            # Calculate entropy losses
-            entropy_loss, info_max_reg = calc_entropy_measures(forward_hook_returns)
-            losses_perturbed['entropy']= entropy_loss
-            losses_perturbed['info_max_reg'] = info_max_reg
             
             if neptune_run is not None:
                 for k, v in losses_perturbed.items():
@@ -203,6 +173,49 @@ class ModelSelection:
                         neptune_run[f"metrics/{model_shortname}/{unique_dataset_name}/{k}_std"] = v[1]
             logger.info(f"model_selection: Perturbed loss for {dataset_name}, {model_shortname}: {pprint.pformat(losses_perturbed)}")
             outputs[unique_dataset_name].update(losses_perturbed)
+                
+            iters_after_start = ds_idx + 1
+            total_seconds_per_iter = (time.perf_counter() - start_time) / iters_after_start
+            if ds_idx % info_freq == 0 or ds_idx == total - 1:
+                eta = datetime.timedelta(seconds=int(total_seconds_per_iter * (total - ds_idx - 1)))
+                logger.info(f"Model selection for {str(model_shortname)} done {ds_idx + 1}/{total} sampled datasets. Total for {cfg.MODEL_SELECTION.N_PERTURBATIONS} perturbations: {total_seconds_per_iter:.4f} s/iter. ETA={eta}")
+        return outputs
+
+
+    def run_ums(self, model_weights, source=True, neptune_run=None):
+        outputs = {}
+        model_shortname = get_model_shortname(model_weights)
+        sampled_datasets = self.sampled_src if source else self.sampled_tgt
+        
+        total = len(sampled_datasets)
+        eta = 1000000000 # hack to get debug to work.
+        info_freq = 5
+        start_time = time.perf_counter()
+        
+        # Iterate through sampled datasets
+        for ds_idx, dataset_name in enumerate(sampled_datasets):
+            load_model_weights(model_weights, self.model)
+            unique_dataset_name = f"src_{dataset_name}_{ds_idx:02}" if source else f"tgt_{dataset_name}_{ds_idx:02}"
+            outputs[unique_dataset_name] = {'source': source}
+            
+            cfg = self.get_updated_cfg_for_model_selection(self.cfg, dataset_name, ds_idx)
+            evaluator = build_evaluator(cfg, dataset_name, self.evaluation_dir, do_eval=True)
+            dataset = DatasetCatalog.get(dataset_name)
+            data_loader = build_detection_test_loader(
+                dataset=dataset,
+                mapper=DatasetMapper(cfg, True),
+                sampler=InferenceSampler(len(dataset)),
+                num_workers=cfg.DATALOADER.NUM_WORKERS)
+            ums_calculator = UMS(cfg, self.model, data_loader, evaluator)
+            ums_calcs = ums_calculator.calculate_measures()
+            
+            if neptune_run is not None:
+                flattened_results = flatten_results_dict(ums_calcs)
+                for k, v in flattened_results.items():
+                    neptune_run[f"metrics/{model_shortname}/{unique_dataset_name}/{k}"] = v
+                    
+            logger.info(f"model_selection: UMS for {dataset_name}, {model_shortname}: {pprint.pformat(ums_calcs)}")
+            outputs[unique_dataset_name].update(ums_calcs)
                 
             iters_after_start = ds_idx + 1
             total_seconds_per_iter = (time.perf_counter() - start_time) / iters_after_start
@@ -225,7 +238,7 @@ class ModelSelection:
         cls_loss_hook_handle = model.roi_heads.register_forward_hook(
             lambda module, inputs, outputs: cls_loss_returns.append(classifier_loss_on_gt_boxes(module, inputs)))        
         start_iter = 0
-        self.iter = start_iter
+        iter = start_iter
         self.storage = EventStorage()
         predictions = []
         with EventStorage(start_iter) as self.storage:
@@ -279,7 +292,7 @@ class ModelSelection:
                             n=5,
                         )
                     start_data_time = time.perf_counter()
-                    self.iter += 1
+                    iter += 1
             except Exception:
                 logger.exception("Exception during training:")
                 raise
@@ -300,35 +313,7 @@ class ModelSelection:
         #model.train() 
         with torch.no_grad():
             outputs = inference_with_targets(model, data) # model in training so targets are used
-        #self._write_metrics(losses, data_time) # Collates loss_dict
         return outputs
-
-    def run_step_inference(self, data, model):
-        assert model.training, "[ModelSelection] model was changed to eval mode!"
-        assert torch.cuda.is_available(), "[ModelSelection] CUDA is required for training!"
-
-        start = time.perf_counter()
-        data_time = time.perf_counter() - start
-        outputs = model(data)
-
-        if isinstance(loss_dict, torch.Tensor):
-            loss_dict = {"total_loss": loss_dict}
-
-        # Match boxes using Faster-RCNN matching quality (from detectron2.modelling.proposal_generator.rpn)
-        match_quality_matrix = pairwise_iou(outputs.gt_boxes, data.targets)  # gt rows, perturb cols
-        match_row, match_col = linear_sum_assignment(match_quality_matrix, maximize=True)
-
-        # From BoS - which doesn't use perturb but dropout
-        #iou_cost_final = iou_cost
-        #iou_matched_row_inds, iou_matched_col_inds = linear_sum_assignment(iou_cost_final)
-        #least_iou_cost_final = iou_cost_final[match_row, match_col].sum().numpy().tolist() / max_match
-
-        # Mine
-        giou_cost = giou_loss(_bboxes_perturbe[match_row, :], _bboxes[match_col, :], reduction="mean").item()
-
-        loss_dict = {'loss_box_reg_giou': giou_cost}
-        self._write_metrics(loss_dict, data_time)
-
 
 
     def get_updated_cfg_for_model_selection(self, cfg, dataset_name, seed_offset):
@@ -355,8 +340,8 @@ class ModelSelection:
         #cfg.AUG = vanilla_cfg.AUG
         #cfg.DOMAIN_ADAPT = vanilla_cfg.DOMAIN_ADAPT
         #cfg.EMA = vanilla_cfg.EMA
-        cfg.MODEL.RPN.BBOX_REG_LOSS_TYPE = "giou"
-        cfg.MODEL.ROI_BOX_HEAD.BBOX_REG_LOSS_TYPE = "giou"
+        #cfg.MODEL.RPN.BBOX_REG_LOSS_TYPE = "giou"
+        #cfg.MODEL.ROI_BOX_HEAD.BBOX_REG_LOSS_TYPE = "giou"
         cfg.SOLVER.IMS_PER_BATCH = 1
         #cfg.MODEL.ROI_BOX_HEAD.USE_SIGMOID_CE = True
         #cfg.DATASETS.TEST = (dataset_name,)
@@ -599,16 +584,6 @@ def calc_score_logits_loss(gt_instances, predicted_scores):
     return kl_losses.item()
 
 
-def calc_entropy_measures(gt_instances):
-    logger.info("model_selection: Calculating entropy measures")
-    gt_scores = [gt["instances"].scores_logits for gt in gt_instances]
-    gt_scores = torch.vstack(gt_scores)
-    entropy = torch.mean(torch.sum(torch.log(gt_scores + 1e-7) * gt_scores, dim=1)) # sum across class then mean
-    gt_scores_averaged = torch.mean(gt_scores, dim=0)
-    info_max_reg = torch.sum(torch.log(gt_scores_averaged + 1e-7)*gt_scores_averaged)
-    return entropy.item(), info_max_reg.item()
-
-
 def register_coco_instances_with_split(name, parent, json_file, image_root, indices, filter_empty):
     if name in DatasetCatalog.keys():
         DatasetCatalog.remove(name)
@@ -660,6 +635,44 @@ def get_dataset_samples(dataset_names, n=250):
     return samples
 
 
+def setup(args):
+    """
+    Copied from detectron2/tools/train_net.py
+    """
+    cfg = get_cfg()
+
+    ## Change here
+    add_aldi_config(cfg)
+    add_aldi_only_config(cfg)  # adds a couple of keys as configs have diverged.
+    ## End change
+
+    cfg.merge_from_file(args.config_file)
+    cfg.merge_from_list(args.opts)
+    cfg.freeze()
+    default_setup(cfg, args)
+    return cfg
 
 
+def get_model_shortname(model_weights):
+    return os.path.basename(model_weights)[:-4]
 
+
+def load_model_weights(path, model):
+    checkpointer = DetectionCheckpointer(model)  
+    ret = checkpointer.load(path)
+
+    if path.endswith(".pth") and "ema" in ret.keys():
+        # self.logger.info("Loading EMA weights as model starting point.")
+        ema_dict = {
+            k.replace('model.', ''): v for k, v in ret['ema'].items()
+        }
+        # incompatible = self.model.load_state_dict(ema_dict, strict=False)
+        ret['model'] = ema_dict
+        incompatible = checkpointer._load_model(ret)
+        if incompatible is not None:
+            checkpointer._log_incompatible_keys(_IncompatibleKeys(
+                missing_keys=incompatible.missing_keys,
+                unexpected_keys=incompatible.unexpected_keys,
+                incorrect_shapes=[]
+            ))
+    return ret
