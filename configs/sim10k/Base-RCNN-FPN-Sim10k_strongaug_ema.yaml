@@ -5,9 +5,9 @@ MODEL:
 DATASETS:
   TRAIN: ("sim10k_cars_train",)
   TEST: ("cityscapes_cars_val",)
-  BATCH_CONTENTS: ("labeled_strong", )
+  BATCH_CONTENTS: ("labeled_strong",)
 UMS:
-  UNLABELED: "cityscapes_cars_train"
+  UNLABELED: ("cityscapes_cars_train",)
 EMA:
   ENABLED: True
 SOLVER:

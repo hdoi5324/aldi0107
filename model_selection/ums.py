@@ -29,9 +29,9 @@ debug_dict = {}
 logger = logging.getLogger("detectron2")
 
 def test_ums(cfg, model, perturbation_types=['das'], evaluation_dir="ums"):
-    dataloader = get_ums_dataloader(cfg.UMS.UNLABELED, cfg)
+    dataloader = get_ums_dataloader(cfg.UMS.UNLABELED[0], cfg)
     evaluation_dir = os.path.join(cfg.OUTPUT_DIR, evaluation_dir)
-    evaluator = build_evaluator(cfg, cfg.UMS.UNLABELED, evaluation_dir, do_eval=True)
+    evaluator = build_evaluator(cfg, cfg.UMS.UNLABELED[0], evaluation_dir, do_eval=True)
     ums_calculator = UMS(cfg, model, dataloader, evaluator, perturbation_types=perturbation_types)
     return ums_calculator.calculate_measures()
     
@@ -53,9 +53,10 @@ class UMS:
         self.dataloader = dataloader
         self.evaluator = evaluator
         self.measures = measures
+        self.perturbation_types = perturbation_types
         
 
-    def calculate_measures(self, scale_boxes=True, layers=[5]):
+    def calculate_measures(self, scale_boxes=True):
         all_results = {}
         from detectron2.modeling.roi_heads import fast_rcnn 
         fast_rcnn.fast_rcnn_inference_single_image = fast_rcnn_inference_single_image_all_scores
@@ -70,34 +71,36 @@ class UMS:
             self.scale_boxes(unperturbed_returns)
 
         # Perturbed forward hook - dropout
-        layer_combinations = [[5], [2,3,4,5]]
-        for layers in layer_combinations:
+        if 'dropout' in self.perturbation_types:
+            layer_combinations = [[5], [2,3,4,5]]
+            for layers in layer_combinations:
+                model_copied = copy.deepcopy(self.model)
+                model_copied = perturb_by_dropout(model_copied, p=self.cfg.UMS.DROPOUT, layer_nos=layers)
+                perturbed_returns = []
+                forward_hook_handle = model_copied.register_forward_hook(lambda module, inputs, outputs: perturbed_returns.extend(get_outputs_with_image_id(inputs, outputs)))
+                _ = inference_on_dataset(model_copied, self.dataloader, self.evaluator)
+                forward_hook_handle.remove() 
+                del model_copied
+                if scale_boxes:
+                    self.scale_boxes(perturbed_returns)
+                results_dict_dropout = calc_ums_measures(unperturbed_returns, perturbed_returns)
+                all_results[f"ums_{'_'.join([str(l) for l in layers])}"] = results_dict_dropout
+        
+        # Perturbed forward hook - DAS paramater perturbation
+        if 'das' in self.perturbation_types:
             model_copied = copy.deepcopy(self.model)
-            model_copied = perturb_by_dropout(model_copied, p=self.cfg.UMS.DROPOUT, layer_nos=layers)
+            model_copied = perturb_model_parameters(model_copied)
             perturbed_returns = []
             forward_hook_handle = model_copied.register_forward_hook(lambda module, inputs, outputs: perturbed_returns.extend(get_outputs_with_image_id(inputs, outputs)))
             _ = inference_on_dataset(model_copied, self.dataloader, self.evaluator)
-            forward_hook_handle.remove() 
+            forward_hook_handle.remove()
             del model_copied
             if scale_boxes:
                 self.scale_boxes(perturbed_returns)
-            results_dict_dropout = calc_ums_measures(unperturbed_returns, perturbed_returns)
-            all_results[f"ums_{'_'.join([str(l) for l in layers])}"] = results_dict_dropout
-        
-        # Perturbed forward hook - DAS paramater perturbation
-        model_copied = copy.deepcopy(self.model)
-        model_copied = perturb_model_parameters(model_copied)
-        perturbed_returns = []
-        forward_hook_handle = model_copied.register_forward_hook(lambda module, inputs, outputs: perturbed_returns.extend(get_outputs_with_image_id(inputs, outputs)))
-        _ = inference_on_dataset(model_copied, self.dataloader, self.evaluator)
-        forward_hook_handle.remove()
-        del model_copied
-        if scale_boxes:
-            self.scale_boxes(perturbed_returns)
-        results_dict_das = calc_ums_measures(unperturbed_returns, perturbed_returns)        
+            results_dict_das = calc_ums_measures(unperturbed_returns, perturbed_returns)        
 
-        self.model.train()
-        all_results["umsdas"] = results_dict_das
+            self.model.train()
+            all_results["umsdas"] = results_dict_das
         all_results["gt"] = results
         return all_results
     

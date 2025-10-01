@@ -196,10 +196,15 @@ def setup(args):
 
     ## Change here
     add_aldi_config(cfg)
-    add_aldi_only_config(cfg)
     add_fcos_config(cfg)
-    #add_deformable_detr_config(cfg)
-    ## End change
+    
+    try:
+        import aldi.detr.align
+        import aldi.detr.distill
+        from aldi.detr.helpers import add_deformable_detr_config
+        add_deformable_detr_config(cfg)
+    except ImportError:
+        print("Failed to load DETR.  Skipping...")
 
     cfg.merge_from_file(args.config_file)
     cfg.merge_from_list(args.opts)

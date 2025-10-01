@@ -1,6 +1,7 @@
 import glob
 import json
 import pprint
+import numpy as np
 
 import detectron2.utils.comm as comm
 from detectron2.checkpoint import DetectionCheckpointer
