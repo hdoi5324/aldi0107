@@ -1,6 +1,6 @@
 _BASE_: "./Base-RCNN-FPN-Sim10k_strongaug_ema.yaml"
 MODEL:
-  WEIGHTS: "outputs/sim10k/sim10k_baseline_strongaug_ema/cityscapes_cars_train_umsdas_ioukl_model_best.pth"
+  WEIGHTS: "outputs/sim10k/sim10k_baseline_strongaug_ema/cityscapes_cars_val_model_best.pth"
 EMA:
   ENABLED: True
 DATASETS:
@@ -24,6 +24,13 @@ AUG:
   UNLABELED_INCLUDE_RANDOM_ERASING: False
   LABELED_MIC_AUG: False
   UNLABELED_MIC_AUG: True
-OUTPUT_DIR: "outputs/sim10k/sim10k_ALDI_bestpre/"
+SOLVER:
+  STEPS: (14999,)
+  MAX_ITER: 15000
+  CHECKPOINT_PERIOD: 2000
+  BACKWARD_AT_END: False
+UMS:
+  UNLABELED: None
+OUTPUT_DIR: "outputs/sim10k/sim10k_ALDI_max/"
 LOGGING:
-  TAGS: "RCCN-FPN,ALDI_bestpre"
+  TAGS: "RCCN-FPN,ALDI_max"
