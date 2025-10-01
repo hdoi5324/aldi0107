@@ -38,11 +38,9 @@ from aldi.fcos.fcos import FCOS
 import aldi.fcos.align
 import aldi.fcos.distill
 
-import aldi.detr.align
-import aldi.detr.distill
+
 from PIL import Image, ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
-from aldi.detr.helpers import add_deformable_detr_config
 
 def setup(args):
     """
@@ -53,7 +51,14 @@ def setup(args):
     ## Change here
     add_aldi_config(cfg)
     add_fcos_config(cfg)
-    add_deformable_detr_config(cfg)
+    
+    try:
+        import aldi.detr.align
+        import aldi.detr.distill
+        from aldi.detr.helpers import add_deformable_detr_config
+        add_deformable_detr_config(cfg)
+    except ImportError:
+        print("Failed to load DETR.  Skipping...")
     ## End change
 
     cfg.merge_from_file(args.config_file)

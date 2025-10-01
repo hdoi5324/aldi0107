@@ -5,3 +5,6 @@ EMA:
   ENABLED: True
 LOGGING:
   TAGS: "Base,RCCN-FPN,StrongAugEMA"
+UMS:
+  UNLABELED: ("UDD_train",)
+OUTPUT_DIR: "outputs/urchininf/urchininf_baseline_strongaug_ema_udd/"

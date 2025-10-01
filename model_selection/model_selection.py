@@ -102,7 +102,7 @@ class ModelSelection:
                 mapper=DatasetMapper(cfg, True),
                 sampler=InferenceSampler(len(dataset)),
                 num_workers=cfg.DATALOADER.NUM_WORKERS)
-            ums_calculator = UMS(cfg, self.model, data_loader, evaluator)
+            ums_calculator = UMS(cfg, self.model, data_loader, evaluator, perturbation_types=['das', 'dropout'])
             ums_calcs = ums_calculator.calculate_measures()
             
             if neptune_run is not None:

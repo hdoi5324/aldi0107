@@ -33,8 +33,8 @@ datasets=("cityscapes/cityscapes_baseline_strongaug_ema_0.04" "imosauv/imosauv_b
 datasets=("urchininf/urchininf_baseline_strongaug_ema")
 for model_dataset in "${datasets[@]}"
 do
-  ${script_start}run_model_selection.py --config-file "${hd}/GitHub/${gd_source}/outputs/${model_dataset}/config.yaml" OUTPUT_DIR ${hd}/GitHub/${gd_source}/outputs/${model_dataset}/ UMS.N_SAMPLE ${sample_size} UMS.N_TRANSFORMED_SOURCE ${transformed_source}
-  ${script_start}modelSele_DAS.py --config-file "${hd}/GitHub/${gd_source}/outputs/${model_dataset}/config.yaml" OUTPUT_DIR "${hd}/GitHub/${gd_source}/outputs/${model_dataset}/" UMS.N_SAMPLE ${sample_size} UMS.N_TRANSFORMED_SOURCE ${transformed_source}
+  #${script_start}run_model_selection.py --config-file "${hd}/GitHub/${gd_source}/outputs/${model_dataset}/config.yaml" OUTPUT_DIR ${hd}/GitHub/${gd_source}/outputs/${model_dataset}/ UMS.N_SAMPLE ${sample_size} UMS.N_TRANSFORMED_SOURCE ${transformed_source}
+  #${script_start}modelSele_DAS.py --config-file "${hd}/GitHub/${gd_source}/outputs/${model_dataset}/config.yaml" OUTPUT_DIR "${hd}/GitHub/${gd_source}/outputs/${model_dataset}/" UMS.N_SAMPLE ${sample_size} UMS.N_TRANSFORMED_SOURCE ${transformed_source}
   ${script_start}BoS_test.py --config-file "${hd}/GitHub/${gd_source}/outputs/${model_dataset}/config.yaml" OUTPUT_DIR "${hd}/GitHub/${gd_source}/outputs/${model_dataset}/" UMS.N_SAMPLE ${sample_size} UMS.N_TRANSFORMED_SOURCE ${transformed_source} UMS.PERTURB_TYPE "dropout"
 done
 

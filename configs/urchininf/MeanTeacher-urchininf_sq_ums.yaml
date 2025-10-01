@@ -1,0 +1,11 @@
+_BASE_: "./MeanTeacher-urchininf_udd_ums.yaml"
+MODEL:
+  WEIGHTS: "outputs/urchininf/urchininf_baseline_strongaug_ema_sq/squidle_urchin_train_umsdas_ioukl_model_best.pth"
+DATASETS:
+  UNLABELED: ("squidle_urchin_2009_train","squidle_east_tas_urchins_train",)
+  TEST: ("squidle_urchin_2011_test",)
+UMS:
+  UNLABELED: ("squidle_urchin_train",)
+OUTPUT_DIR: "outputs/urchininf/urchininf_meanteacher_sq_ums/"
+LOGGING:
+  TAGS: "RCCN-FPN,MT_ums"

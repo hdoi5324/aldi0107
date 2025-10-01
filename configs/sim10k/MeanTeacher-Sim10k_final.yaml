@@ -5,8 +5,8 @@ EMA:
   ENABLED: True
 DATASETS:
   UNLABELED: ("cityscapes_cars_train",)
-  BATCH_CONTENTS: ("labeled_strong", "unlabeled_strong")
-  BATCH_RATIOS: (1,1)
+  BATCH_CONTENTS: ("labeled_weak", "labeled_strong", "unlabeled_strong")
+  BATCH_RATIOS: (1,1,1)
 DOMAIN_ADAPT:
   TEACHER:
     ENABLED: True
@@ -16,10 +16,15 @@ DOMAIN_ADAPT:
     HARD_ROIH_REG_ENABLED: False
     HARD_OBJ_ENABLED: True
     HARD_RPN_REG_ENABLED: False
-#SOLVER:
-#  STEPS: (59999,)
-#  MAX_ITER: 60000
-#  BACKWARD_AT_END: False
-OUTPUT_DIR: "outputs/sim10k/sim10k_MT/"
+SOLVER:
+  STEPS: (14999,)
+  MAX_ITER: 15000
+  CHECKPOINT_PERIOD: 2000
+  BACKWARD_AT_END: False
+  BASE_LR: 0.03 # LR should be appropriate for IMS_PER_BATCH and MAX_ITERS
+  IMS_PER_BATCH: 24 # Batch = 16 with 2 per GPU with 8 GPU = 0.02 LR
+UMS:
+  UNLABELED: None
+OUTPUT_DIR: "outputs/sim10k/sim10k_MT_final/"
 LOGGING:
-  TAGS: "RCCN-FPN,MT"
+  TAGS: "RCCN-FPN,MT_final"

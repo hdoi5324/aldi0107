@@ -220,10 +220,13 @@ class ALDITrainer(DefaultTrainer):
                ums_eval_hook = hooks.EvalHook(self.cfg.UMS.CHECKPOINT_PERIOD, lambda: test_ums(self.cfg, self.ema.model))
                if comm.is_main_process():
                     ret.insert(-1, ums_eval_hook) # before PeriodicWriter if in main process
-                    ret.insert(-1, BestCheckpointer(self.cfg.UMS.CHECKPOINT_PERIOD, self.checkpointer,
-                                                    f"umsdas/ioukl", "max", file_prefix=f"{self.cfg.UMS.UNLABELED}_umsdas_ioukl_model_best"))                 
-                    ret.insert(-1, BestCheckpointer(self.cfg.UMS.CHECKPOINT_PERIOD, self.checkpointer,
-                                                    f"ums_5/ioukl", "max", file_prefix=f"{self.cfg.UMS.UNLABELED}_ums_5/ioukl_ioukl_model_best"))                 
+                    if len(self.cfg.UMS.UNLABELED) == 1:
+                         ret.insert(-1, BestCheckpointer(self.cfg.UMS.CHECKPOINT_PERIOD, self.checkpointer,
+                                                         f"umsdas/ioukl", "max", file_prefix=f"{self.cfg.UMS.UNLABELED}_umsdas_ioukl_model_best"))
+                    else: 
+                         for test_set in self.self.cfg.UMS.UNLABELED:
+                              ret.insert(-1, BestCheckpointer(self.cfg.UMS.CHECKPOINT_PERIOD, self.checkpointer,
+                                                         f"umsdas/ioukl", "max", file_prefix=f"{test_set}_umsdas_ioukl_model_best"))
                else:
                     ret.append(ums_eval_hook)
           ## END UMS hooks

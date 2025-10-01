@@ -12,7 +12,7 @@ from aldi.helpers import Detectron2COCOEvaluatorAdapter
 from aldi.config import add_aldi_config
 from aldi.config_aldi_only import add_aldi_only_config
 from aldi.config_fcos import add_fcos_config
-from aldi.detr.helpers import add_deformable_detr_config
+#from aldi.detr.helpers import add_deformable_detr_config
 
 def build_evaluator(cfg, dataset_name, output_folder=None, do_eval=True):
     """Just do COCO Evaluation.
@@ -196,10 +196,15 @@ def setup(args):
 
     ## Change here
     add_aldi_config(cfg)
-    add_aldi_only_config(cfg)
     add_fcos_config(cfg)
-    add_deformable_detr_config(cfg)
-    ## End change
+    
+    try:
+        import aldi.detr.align
+        import aldi.detr.distill
+        from aldi.detr.helpers import add_deformable_detr_config
+        add_deformable_detr_config(cfg)
+    except ImportError:
+        print("Failed to load DETR.  Skipping...")
 
     cfg.merge_from_file(args.config_file)
     cfg.merge_from_list(args.opts)
