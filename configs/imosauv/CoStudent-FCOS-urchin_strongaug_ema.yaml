@@ -21,6 +21,10 @@ DOMAIN_ADAPT:
     HARD_RPN_REG_ENABLED: True
 SAOD:
   LABELING_METHOD: "WeakTeacherWStrongStudentW" # or "CoStudent", "StudentTeacher"
+  WEAK_LOSS: 1.0
+  STRONG_LOSS: 1.0
+TEST:
+  EVAL_PERIOD: 2000
 SOLVER:
   #STEPS: (6000, 8000,) #
   #MAX_ITER: 9001 # 3 X 3000
