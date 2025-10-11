@@ -1,0 +1,5 @@
+_BASE_: "CoStudent-DETR-urchin_strongaug_ema.yaml"
+DATASETS:
+  TRAIN: ("loose_ob17863_train_og_only",)
+  TEST: ("squidle_ob_point_test",)
+OUTPUT_DIR: "outputs/imosauv/ob_detr_saod/"

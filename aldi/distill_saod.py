@@ -90,7 +90,7 @@ class SparseStudentTeacherDistiller(Distiller):
             strong_losses = self.student(strong_batched_inputs) if self.strong_loss_gamma > 0 else {}# weak pred denoised by teacher and merged with gt
             loss_keys = list(set(weak_losses.keys()) | set(strong_losses.keys()))
             for k in loss_keys:
-                standard_losses[k] = (self.weak_loss_gamma*weak_losses.get(k, 0) + self.strong_loss_gamma*strong_losses.get(k, 0))/(self.weak_loss_gamma + self.strong_loss_gamma)
+                standard_losses[k] = self.weak_loss_gamma*weak_losses.get(k, 0) + self.strong_loss_gamma*strong_losses.get(k, 0)
         if was_eval: 
             self.teacher.eval()
             

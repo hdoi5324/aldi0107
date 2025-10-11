@@ -124,6 +124,8 @@ register_coco_instances("loose_urchin17631_train_erased_only", {}, "datasets/loo
 register_coco_instances("loose_urchin17631_train_cropped_only", {}, "datasets/loose/loose_17631/annotations/instances_train_cropped_only.json", "datasets/loose/loose_17631/images")
 register_coco_instances("loose_urchin17631_train_og_only", {}, "datasets/loose/loose_17631/annotations/instances_train_og_only.json", "datasets/loose/loose_17631/images")
 register_coco_instances("loose_urchin17631_train_noclip", {}, "datasets/loose/loose_17631/annotations/instances_train_noclip.json", "datasets/loose/loose_17631/images")
+register_coco_instances("loose_ob17863_train_og_only", {}, "datasets/loose/loose_17863/annotations/instances_train_og_only.json", "datasets/loose/loose_17863/images")
+register_coco_instances("loose_ob17863_train_cropped_only", {}, "datasets/loose/loose_17863/annotations/instances_train_cropped_only.json", "datasets/loose/loose_17863/images")
 
 # Urchin 1-2 points with corresponding bbox annotated dataset
 register_coco_instances("loose_urchin17714_train", {}, "datasets/loose/loose_17714/annotations/instances_train.json", "datasets/loose/loose_17714/images")
@@ -140,3 +142,4 @@ register_coco_instances("coco_sparse_extreme", {}, "datasets/coco/annotations/in
 register_coco_instances("coco_sparse_keep1", {}, "datasets/coco/annotations/keep1_instances_train2017.json", "datasets/coco/train2017")
 
 register_coco_instances("squidle_yellowball_test", {}, "datasets/squidle_coco/squidle_yellowball_test/annotations/instances_test.json", "datasets/squidle_coco/squidle_yellowball_test/test2023")
+register_coco_instances("squidle_ob_point_test", {}, "datasets/squidle_coco/squidle_ob_sparse_point_test/annotations/instances_test.json", "datasets/squidle_coco/squidle_ob_sparse_point_test/test2023")

@@ -38,6 +38,7 @@ class SparseStudentTeacherPseudoLabeler:
         else:
             return "Not implemented"
 
+
 def detach_predictions(list_of_instances):
     for item in list_of_instances:
         for k, v in item.get_fields().items():
@@ -113,7 +114,8 @@ def denoise_detections(Instance1, Instance2, alpha_1_threshold=0.5, priority="io
     missing_Instance.scores = scores1[missing_inds]
 
     return Instances.cat([missing_Instance,refine_gt_Instance])
-@torch.no_grad()
+
+
 def merge_ground_truth_costudent(targets, predictions, iou_threshold):
     """
     Adapted from https://github.com/hustvl/CoStudent/blob/main/configs/CoStudent_fcos.res50.score.05.teahcer_score.06.cocomiss50/fcos.py
@@ -146,21 +148,20 @@ def merge_ground_truth_costudent(targets, predictions, iou_threshold):
 
 def sparse_student_teacher_pseudo_label_inplace(model, labeled_weak, labeled_strong, 
                                                 score_threshold, threshold_method, alpha_3_threshold=0.4):
-    with torch.no_grad():
-        # get predictions from teacher model on weakly-augmented data
-        # do_postprocess=False to disable transforming outputs back into original image space
-        was_training = model.training
-        model.eval()
-        teacher_preds = model.inference(labeled_weak, do_postprocess=False)
-        if was_training: model.train()
+    # get predictions from teacher model on weakly-augmented data
+    # do_postprocess=False to disable transforming outputs back into original image space
+    was_training = model.training
+    model.eval()
+    teacher_preds = model.inference(labeled_weak, do_postprocess=False)
+    if was_training: model.train()
 
-        # postprocess pseudo labels (thresholding)
-        teacher_preds, _ = process_pseudo_label(teacher_preds, score_threshold, threshold_method)
-        merge_ground_truth_costudent(labeled_weak, teacher_preds, alpha_3_threshold)
+    # postprocess pseudo labels (thresholding)
+    teacher_preds, _ = process_pseudo_label(teacher_preds, score_threshold, threshold_method)
+    merge_ground_truth_costudent(labeled_weak, teacher_preds, alpha_3_threshold)
 
-        # add pseudo labels back as "ground truth" to labeled_strong
-        for weak, strong in zip(labeled_weak, labeled_strong):
-            strong["instances"] = weak['instances']
+    # add pseudo labels back as "ground truth" to labeled_strong
+    for weak, strong in zip(labeled_weak, labeled_strong):
+        strong["instances"] = weak['instances']
 
 
 def sparse_strong_studentw_weak_students_pseudo_label_inplace(teacher_model, student_model, labeled_weak, labeled_strong, 
@@ -172,13 +173,15 @@ def sparse_strong_studentw_weak_students_pseudo_label_inplace(teacher_model, stu
     was_student_training = student_model.training
     student_model.eval()
 
-    # Get predictions - lots of detaching from graph, probably too much.
-    teacher_preds = detach_predictions(teacher_model.inference([{"image": item['image'].detach().clone()} for item in labeled_weak], do_postprocess=False))
-    student_weak_preds = detach_predictions(student_model.inference([{"image": item['image'].detach().clone()} for item in labeled_weak], do_postprocess=False))
-    student_strong_preds = detach_predictions(student_model.inference([{"image": item['image'].detach().clone()} for item in labeled_strong], do_postprocess=False))
-
-    if was_teacher_training: teacher_model.train()    
-    if was_student_training: student_model.train()
+    # Get predictions 
+    if isinstance(teacher_model, DeformableDETR):
+        teacher_preds = [i['instances'] for i in teacher_model([{"image": item['image'].clone().detach()} for item in labeled_weak])]
+        student_weak_preds = [i['instances'] for i in student_model([{"image": item['image'].clone().detach()} for item in labeled_weak])]
+        student_strong_preds = [i['instances'] for i in student_model([{"image": item['image'].clone().detach()} for item in labeled_strong])]
+    else:
+        teacher_preds = teacher_model.inference([{"image": item['image'].clone().detach()} for item in labeled_weak], do_postprocess=False)
+        student_weak_preds = student_model.inference([{"image": item['image'].clone().detach()} for item in labeled_weak], do_postprocess=False)
+        student_strong_preds = student_model.inference([{"image": item['image'].clone().detach()} for item in labeled_strong], do_postprocess=False)
     
     # postprocess pseudo labels (thresholding)
     teacher_preds, _ = process_pseudo_label(teacher_preds, score_threshold, threshold_method)
@@ -193,6 +196,10 @@ def sparse_strong_studentw_weak_students_pseudo_label_inplace(teacher_model, stu
     merge_ground_truth_costudent(labeled_weak, student_strong_preds, alpha_3_threshold)
     merge_ground_truth_costudent(labeled_strong, student_weak_preds, alpha_3_threshold)
 
+    if was_teacher_training: teacher_model.train()    
+    if was_student_training: student_model.train()
+
+
 def sparse_strong_teacherw_weak_studentw_pseudo_label_inplacev2(teacher_model, student_model, labeled_weak, labeled_strong, 
                                                                 score_threshold, threshold_method, denoise_priority, 
                                                                 alpha_1_threshold=0.5, alpha_2_threshold=0.9, alpha_3_threshold=0.4):
@@ -202,12 +209,13 @@ def sparse_strong_teacherw_weak_studentw_pseudo_label_inplacev2(teacher_model, s
     was_student_training = student_model.training
     student_model.eval()
 
-    teacher_preds = detach_predictions(teacher_model.inference([{"image": item['image'].detach().clone()} for item in labeled_weak], do_postprocess=False)) #todo: try copying labeled_weak
-    student_weak_preds = detach_predictions(student_model.inference([{"image": item['image'].detach().clone()} for item in labeled_weak], do_postprocess=False))
+    if isinstance(teacher_model, DeformableDETR):
+        teacher_preds = [i['instances'] for i in teacher_model([{"image": item['image'].clone().detach()} for item in labeled_weak])]
+        student_weak_preds = [i['instances'] for i in student_model([{"image": item['image'].clone().detach()} for item in labeled_weak])]
+    else:
+        teacher_preds = teacher_model.inference([{"image": item['image'].clone().detach()} for item in labeled_weak], do_postprocess=False) 
+        student_weak_preds = student_model.inference([{"image": item['image'].clone().detach()} for item in labeled_weak], do_postprocess=False)
 
-    if was_teacher_training: teacher_model.train()    
-    if was_student_training: student_model.train()
-    
     # postprocess pseudo labels (thresholding)
     teacher_preds, _ = process_pseudo_label(teacher_preds, score_threshold, threshold_method)
     student_weak_preds, _ = process_pseudo_label(student_weak_preds, score_threshold, threshold_method)
@@ -218,7 +226,11 @@ def sparse_strong_teacherw_weak_studentw_pseudo_label_inplacev2(teacher_model, s
     # Merge resulting preds with gt from opposite aug type eg weak preds with strong batch
     merge_ground_truth_costudent(labeled_strong, teacher_preds, alpha_3_threshold)
     merge_ground_truth_costudent(labeled_weak, student_weak_preds, alpha_3_threshold)
-    
+
+    if was_teacher_training: teacher_model.train()    
+    if was_student_training: student_model.train()
+
+
 def sparse_weak_teacherw_strong_studentw_pseudo_label_inplacev3(teacher_model, student_model, labeled_weak, labeled_strong, 
                                                                 score_threshold, threshold_method, denoise_priority, 
                                                                 alpha_1_threshold=0.5, alpha_2_threshold=0.9, alpha_3_threshold=0.4):
@@ -229,14 +241,11 @@ def sparse_weak_teacherw_strong_studentw_pseudo_label_inplacev3(teacher_model, s
     student_model.eval()
 
     if isinstance(teacher_model, DeformableDETR):
-        teacher_preds = detach_predictions([i['instances'] for i in teacher_model([{"image": item['image'].detach().clone()} for item in labeled_weak])])#todo: try copying labeled_weak
-        student_weak_preds = detach_predictions([i['instances'] for i in student_model([{"image": item['image'].detach().clone()} for item in labeled_weak])])
+        teacher_preds = [i['instances'] for i in teacher_model([{"image": item['image'].clone().detach()} for item in labeled_weak])]
+        student_weak_preds = [i['instances'] for i in student_model([{"image": item['image'].clone().detach()} for item in labeled_weak])]
     else:
-        teacher_preds = detach_predictions(teacher_model.inference([{"image": item['image'].detach().clone()} for item in labeled_weak], do_postprocess=False)) #todo: try copying labeled_weak
-        student_weak_preds = detach_predictions(student_model.inference([{"image": item['image'].detach().clone()} for item in labeled_weak], do_postprocess=False))
-
-    if was_teacher_training: teacher_model.train()    
-    if was_student_training: student_model.train()
+        teacher_preds = teacher_model.inference([{"image": item['image'].clone().detach()} for item in labeled_weak], do_postprocess=False) 
+        student_weak_preds = student_model.inference([{"image": item['image'].clone().detach()} for item in labeled_weak], do_postprocess=False)
     
     # postprocess pseudo labels (thresholding)
     teacher_preds, _ = process_pseudo_label(teacher_preds, score_threshold, threshold_method)
@@ -248,5 +257,7 @@ def sparse_weak_teacherw_strong_studentw_pseudo_label_inplacev3(teacher_model, s
     # Merge resulting preds with gt from opposite aug type eg weak preds with strong batch
     merge_ground_truth_costudent(labeled_weak, teacher_preds, alpha_3_threshold)
     merge_ground_truth_costudent(labeled_strong, student_weak_preds, alpha_3_threshold)
-
+    
+    if was_teacher_training: teacher_model.train()    
+    if was_student_training: student_model.train()
 

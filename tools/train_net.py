@@ -6,6 +6,7 @@ Copied directly from detectron2/tools/train_net.py except where noted.
 from datetime import timedelta
 import time
 import os
+import sys
 import functools
 import logging
 
@@ -49,9 +50,16 @@ def setup(args):
     cfg = get_cfg()
 
     ## Change here
-    add_aldi_config(cfg)
-    add_fcos_config(cfg)
     
+    # enclose YOLO in a try/except because we want the extra pip dependencies to be optional
+    #try:
+    #    from aldi.yolo.helpers import add_yolo_config
+    #    import aldi.yolo.align # register align mixins with Detectron2
+    #    import aldi.yolo.distill # register distillers and distill mixins with Detectron2
+    #    add_yolo_config(cfg)
+    #except:
+    #    print("Could not load YOLO library.")
+        
     try:
         import aldi.detr.align
         import aldi.detr.distill
@@ -59,6 +67,8 @@ def setup(args):
         add_deformable_detr_config(cfg)
     except ImportError:
         print("Failed to load DETR.  Skipping...")
+    add_fcos_config(cfg)    
+    add_aldi_config(cfg)
     ## End change
 
     cfg.merge_from_file(args.config_file)

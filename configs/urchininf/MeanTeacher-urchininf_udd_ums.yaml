@@ -1,6 +1,6 @@
 _BASE_: "./Base-RCNN-FPN-urchininf_strongaug_ema.yaml"
 MODEL:
-  WEIGHTS: "outputs/urchininf/urchininf_baseline_strongaug_ema_udd/UDD_urchin_train_umsdas_ioukl_model_best.pth"
+  WEIGHTS: "outputs/urchininf/urchininf_baseline_strongaug_ema_udd/UDD_train_umsdas_ioukl_model_best.pth"
 EMA:
   ENABLED: True
 DATASETS:
@@ -18,6 +18,8 @@ DOMAIN_ADAPT:
 SOLVER:
   IMS_PER_BATCH: 24 # was 24 with BASE_LR 0.03
   BASE_LR: 0.03 
+  WARMUP_ITERS: 1000
+  WARMUP_FACTOR: 0.01
 UMS:
   UNLABELED: ("UDD_train",)
 OUTPUT_DIR: "outputs/urchininf/urchininf_meanteacher_udd_ums/"

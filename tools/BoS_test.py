@@ -504,7 +504,9 @@ def main(args):
     source_dataset = get_detection_dataset_dicts(cfg.DATASETS.TRAIN, filter_empty=False)#[:debug_length]
     dataloader_source = build_detection_test_loader(source_dataset, mapper=DatasetMapper(cfg, False), sampler=InferenceSampler(len(source_dataset)))
     test_dataset = get_detection_dataset_dicts(cfg.DATASETS.TEST[0], filter_empty=False)#[:debug_length]
-    dataloader_target = build_detection_test_loader(test_dataset, mapper=DatasetMapper(cfg, False), sampler=InferenceSampler(len(test_dataset)))    
+    dataloader_target = build_detection_test_loader(test_dataset, mapper=DatasetMapper(cfg, False), 
+                                                    sampler=InferenceSampler(len(test_dataset)), 
+                                                    num_workers=cfg.DATALOADER.NUM_WORKERS)    
     
     dataloader = dataloader_target
     
@@ -591,7 +593,7 @@ def main(args):
                         bboxes.append(b)
                         cls.append(cls_raw[b_idx])
                         cls_areaRng[area_idx].append(cls_raw[b_idx])
-                        entropy_areaRng[area_idx].append(stats.entropy([cls_raw[b_idx].cpu(), 1 - cls_raw[b_idx].cpu()], base=2))
+                        #entropy_areaRng[area_idx].append(stats.entropy([cls_raw[b_idx].cpu(), 1 - cls_raw[b_idx].cpu()], base=2))
                 
                 for b_idx, b in enumerate(bboxes_perturbe_raw):
                     x1, y1, x2, y2 = b

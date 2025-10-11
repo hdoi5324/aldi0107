@@ -17,7 +17,9 @@ import tqdm
 import numpy as np
 
 from detectron2.config import get_cfg
-from detectron2.engine import default_setup
+from detectron2.data import MetadataCatalog
+from detectron2.engine import default_argument_parser, default_setup, launch
+from detectron2.evaluation import verify_results
 
 from detectron2.structures import BitMasks, Boxes, BoxMode, Keypoints, PolygonMasks, RotatedBoxes
 
@@ -29,12 +31,18 @@ from detectron2.utils.visualizer import Visualizer, ColorMode, _create_text_labe
 
 from aldi.checkpoint import DetectionCheckpointerWithEMA
 from aldi.config import add_aldi_config
+from aldi.config_fcos import add_fcos_config
 from aldi.ema import EMA
 from aldi.trainer import ALDITrainer
 import aldi.datasets # register datasets with Detectron2
-import aldi.datasets_benthic
 import aldi.model # register ALDI R-CNN model with Detectron2
 import aldi.backbone # register ViT FPN backbone with Detectron2
+from aldi.split_datasets import split_train_data
+import aldi.datasets_benthic # register datasets with Detectron2
+import aldi.distill_saod
+from aldi.fcos.fcos import FCOS
+import aldi.fcos.align
+import aldi.fcos.distill
 
 
 def setup(args):
@@ -44,12 +52,28 @@ def setup(args):
     cfg = get_cfg()
 
     ## Change here
+    # enclose YOLO in a try/except because we want the extra pip dependencies to be optional
+    #try:
+    #    from aldi.yolo.helpers import add_yolo_config
+    #    import aldi.yolo.align # register align mixins with Detectron2
+    #    import aldi.yolo.distill # register distillers and distill mixins with Detectron2
+    #    add_yolo_config(cfg)
+    #except:
+    #    print("Could not load YOLO library.")
+        
+    try:
+        import aldi.detr.align
+        import aldi.detr.distill
+        from aldi.detr.helpers import add_deformable_detr_config
+        add_deformable_detr_config(cfg)
+    except ImportError:
+        print("Failed to load DETR.  Skipping...")
     add_aldi_config(cfg)
+    add_fcos_config(cfg)
     ## End change
 
     cfg.merge_from_file(args.config_file)
     cfg.merge_from_list(args.opts)
-    cfg.DATALOADER.NUM_WORKERS = 0
     cfg.freeze()
     default_setup(cfg, args)
     return cfg

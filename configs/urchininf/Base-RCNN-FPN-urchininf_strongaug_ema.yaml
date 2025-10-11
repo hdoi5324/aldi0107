@@ -5,6 +5,9 @@ EMA:
   ENABLED: True
 LOGGING:
   TAGS: "Base,RCCN-FPN,StrongAugEMA"
+SOLVER:
+  CHECKPOINT_PERIOD: 1000 #2000
 UMS:
   UNLABELED: ("UDD_train",)
 OUTPUT_DIR: "outputs/urchininf/urchininf_baseline_strongaug_ema_udd/"
+

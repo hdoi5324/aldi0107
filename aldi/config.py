@@ -136,7 +136,7 @@ def add_aldi_config(cfg):
     _C.SAOD.STRONG_LOSS = 1.0
     _C.SAOD.DENOISE_PRIORITY = "iou" # "iou" or "score"
     
-    # For configs from older runs - NOT USED ANYMORE
+    # For configs from older runs - NOT USED ANYMORE 
     _C.MODEL_SELECTION = CN()
     _C.MODEL_SELECTION.N_PERTURBATIONS = 1
     _C.MODEL_SELECTION.N_TRANSFORMED_SOURCE = 0   
@@ -145,4 +145,10 @@ def add_aldi_config(cfg):
     _C.MODEL_SELECTION.N_SAMPLE = 250
     _C.AUG.MOSAIC = None
     _C.AUG.MOSAIC_P = None
+    
+    #todo: check these exist before overwriting
+    _C.SOLVER.BACKBONE_LR_MULTIPLIER = None
+    _C.SOLVER.LR_BACKBONE_NAMES = None
+    _C.SOLVER.LR_LINEAR_PROJ_MULTIPLIER = None
+    _C.SOLVER.LR_LINEAR_PROJ_NAMES = None
     

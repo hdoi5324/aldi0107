@@ -2,12 +2,13 @@ _BASE_: "../Base-RCNN-FPN.yaml"
 MODEL:
   ROI_HEADS:
     NUM_CLASSES: 1
-  WEIGHTS: "outputs/urchininf/aldi_inf_sq/model_final.pth"
 DATASETS:
   TRAIN: ("loose_urchin17714_train_og_only",)
   TEST: ("squidle_urchin_2011_test",)
   BATCH_CONTENTS: ("labeled_strong","labeled_weak",)
   BATCH_RATIOS: (1,1,)
+INPUT:
+  MAX_SIZE_TRAIN: 1333
 EMA:
   ENABLED: True
 DOMAIN_ADAPT:
@@ -25,7 +26,9 @@ SAOD:
 SOLVER:
   STEPS: (6000, 8000,) # 
   MAX_ITER: 9001 # 3 X 3000
+  WARMUP_ITERS: 1000
+  WARMUP_FACTOR: 0.001
   CHECKPOINT_PERIOD: 1000
-OUTPUT_DIR: "outputs/imosauv/urchin_saod_urchininf/"
+OUTPUT_DIR: "outputs/imosauv/urchin_og_saod/"
 LOGGING:
-  TAGS: "SAOD,RCCN-FPN,INF"
+  TAGS: "SAOD,RCCN-FPN"

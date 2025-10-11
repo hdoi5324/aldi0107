@@ -8,4 +8,4 @@ UMS:
   UNLABELED: ("squidle_urchin_train",)
 OUTPUT_DIR: "outputs/urchininf/urchininf_aldi_sq_ums/"
 LOGGING:
-  TAGS: "RCCN-FPN,ADI_ums"
+  TAGS: "RCCN-FPN,ADLI_ums"
