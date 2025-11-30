@@ -36,8 +36,8 @@ from aldi.config_aldi_only import add_aldi_only_config
 #from aldi.config import add_aldi_config
 #from aldi.methodsDirectory2Fast import perturb_by_dropout, dropout_masks
 
-from model_selection.ums import UMS, perturb_model_parameters
-from model_selection.utils import build_evaluator, perturb_by_dropout, dropout_masks
+from model_selection.ums import UMS
+from model_selection.utils import build_evaluator, perturb_by_dropout, dropout_masks, perturb_model_parameters
 from aldi.split_datasets import register_coco_instances_with_split
 
 # Override box_loss methods to use mean

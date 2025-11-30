@@ -15,7 +15,7 @@ from fvcore.nn.giou_loss import giou_loss
 from scipy.optimize import linear_sum_assignment
 
 from model_selection.fast_rcnn import fast_rcnn_inference_single_image_all_scores
-from model_selection.utils import build_evaluator, perturb_by_dropout
+from model_selection.utils import build_evaluator, perturb_by_dropout, _bbox_overlaps, perturb_model_parameters
 
 # Override box_loss methods to use mean todo: remove this stuff
 # from .box_loss import _mean_dense_box_regression_loss, classifier_loss_on_gt_boxes, get_outputs_with_image_id
@@ -73,6 +73,7 @@ class UMS:
         # Perturbed forward hook - dropout
         if 'dropout' in self.perturbation_types:
             layer_combinations = [[5], [2,3,4,5]]
+            layer_combinations = []
             for layers in layer_combinations:
                 model_copied = copy.deepcopy(self.model)
                 model_copied = perturb_by_dropout(model_copied, p=self.cfg.UMS.DROPOUT, layer_nos=layers)
@@ -124,7 +125,7 @@ def get_outputs_with_image_id(inputs, outputs):
 
 def calc_ums_measures(unperturbed_results, perturbed_results):
     logger.info("model_selection: Calculating box loss")
-    measures=["iou", "giou", "kldiv", "ioukl", "ioukl_iou", "ioukl_kl"]
+    measures=["iou", "giou", "kldiv", "ioukl", "ioukl_fis", "ioukl_iou", "ioukl_kl"]
     measure_calc = {m: [] for m in measures}
 
     #ious, gious, smooth_l1_losses = [], [], []
@@ -146,6 +147,7 @@ def calc_ums_measures(unperturbed_results, perturbed_results):
         
         # calculate matrix, use bipartite matching to find best matched boxes and calculate mean
         iou_matrix = pairwise_iou(pred_boxes, gt_boxes).to("cpu") # gt rows, perturb cols
+        iou_matrix_fis = iou_loss_fis(pred_boxes.tensor, gt_boxes.tensor).to("cpu")
         iou, match_row_iou, match_col_iou = calc_mean_match(iou_matrix)
         if iou is not None:
             measure_calc["iou"].append(iou)
@@ -160,9 +162,14 @@ def calc_ums_measures(unperturbed_results, perturbed_results):
             measure_calc["kldiv"].append(kl_div)
         
         ioukl_matrix = iou_matrix - kl_div_matrix
+        ioukl_matrix_fis = iou_matrix_fis + kl_div_matrix # same as DAS FIS calc
+        
+        ioukl_matrix_min = kl_div_matrix - iou_matrix
         ioukl, match_row_ioukl, match_col_ioukl = calc_mean_match(ioukl_matrix)
+        ioukl_fis, _, _ = calc_mean_match(ioukl_matrix_fis, maximize=False)
         if ioukl is not None:
             measure_calc["ioukl"].append(ioukl)
+            measure_calc["ioukl_fis"].append(ioukl_fis)
             measure_calc["ioukl_iou"].append(float(iou_matrix[match_row_ioukl, match_col_ioukl].mean().item()))
             measure_calc["ioukl_kl"].append(-1.0*float(kl_div_matrix[match_row_ioukl, match_col_ioukl].mean().item()))
     measure_results = {m: float(np.mean(k)) for m, k in measure_calc.items()}
@@ -186,6 +193,14 @@ def computeKLDivergenceMatrix(logits1: torch.Tensor, logits2: torch.Tensor, eps:
     return kl_matrix
 
 
+def iou_loss_fis(bboxes, gt_bboxes):
+    overlaps = _bbox_overlaps(bboxes, gt_bboxes, mode="iou", is_aligned=False)
+
+    # The 1 is a constant that doesn't change the matching, so omitted.
+    iou_cost = -overlaps
+    return iou_cost
+
+
 def calc_entropy_measures(gt_instances):
     logger.info("model_selection: Calculating entropy measures")
     gt_scores = [gt["instances"].scores_logits for gt in gt_instances]
@@ -196,41 +211,3 @@ def calc_entropy_measures(gt_instances):
     return entropy.item(), info_max_reg.item()
 
 
-def perturb_model_parameters(module, **kwargs):
-    # Based on DAS.  rcnn.py in DAobjTwoStagePseudoLabGeneralizedRCNN.inference method.
-    # Applies perturbation to model rather than in the model class.
-    
-    if not hasattr(module, 'original_params'):
-        module.original_params = None
-    if module.original_params is None: # Perturb model once
-        ignoreNames = "D_img"
-
-        stds = []
-        print("saving original parameters...")
-        module.original_params = {}
-        for name, param in module.named_parameters():
-            if ignoreNames in name:
-                continue
-            module.original_params[name] = param.clone()
-            std = param.std().item()
-            stds.append(std) if not np.isnan(std) else ...
-        # print(np.mean(stds))
-        step = 1 # * np.exp(np.mean(std))
-        print("step is setted to {}".format(step))
-
-        n_params = sum([
-            p.numel() for n, p in module.named_parameters() if not ignoreNames in n
-        ])
-        random_vector = torch.rand(n_params)
-        direction = (random_vector / torch.norm(random_vector)).cuda() * step
-
-        offset = 0
-        for n, p in module.named_parameters():
-            if ignoreNames in n:
-                continue
-            size = p.numel()
-            ip = direction[offset:offset+size].view(p.shape)
-            p.data = module.original_params[n] + ip
-            offset += size
-        print("Finished perturbing.")
-    return module

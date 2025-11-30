@@ -1,0 +1,8 @@
+_BASE_: "./MeanTeacher-imosauv_final.yaml"
+MODEL:
+  WEIGHTS: "outputs/imosauv/imosauv_baseline_strongaug_ema_udd/UDD_train_umsdas_ioukl_model_best.pth"
+UMS:
+  UNLABELED: ("UDD_train",)
+OUTPUT_DIR: "outputs/imosauv/imosauv_meanteacher_ums/"
+LOGGING:
+  TAGS: "RCCN-FPN,MT_ums"

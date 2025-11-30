@@ -5,8 +5,7 @@ import os
 from detectron2.evaluation import inference_on_dataset
 
 from model_selection.fast_rcnn import fast_rcnn_inference_single_image_all_scores
-from model_selection.ums import perturb_model_parameters
-from model_selection.utils import build_evaluator, _bbox_overlaps
+from model_selection.utils import build_evaluator, _bbox_overlaps, perturb_model_parameters
 from detectron2.structures import pairwise_iou, Boxes
 
 from scipy.optimize import linear_sum_assignment

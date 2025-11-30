@@ -20,7 +20,7 @@ class YoloDistiller(Distiller):
         assert not do_hard_rpn_reg, "enabling DOMAIN_ADAPT.DISTILL.HARD_RPN_REG_ENABLED is not supported for Yolo"
         set_attributes(self, locals())
         self.register_hooks()
-        self.pseudo_labeler = PseudoLabeler(teacher, pseudo_label_threshold)
+        self.pseudo_labeler = PseudoLabeler(teacher, pseudo_label_threshold, "")
 
     @classmethod
     def from_config(cls, cfg, teacher, student):

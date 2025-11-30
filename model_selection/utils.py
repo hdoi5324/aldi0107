@@ -210,3 +210,38 @@ def setup(args):
     cfg.merge_from_list(args.opts)
     cfg.freeze()
     return cfg
+
+
+def perturb_model_parameters(module):
+    """
+    Based on DAS - https://github.com/HenryYu23/DAS.  
+    rcnn.py in DAobjTwoStagePseudoLabGeneralizedRCNN.inference method.
+    Applies perturbation to model rather than in the model class."""
+    
+    if not hasattr(module, 'original_params'):
+        module.original_params = None
+    if module.original_params is None: # Perturb model once
+        ignoreNames = "D_img" # Discriminator parameters
+        print("saving original parameters...")
+        module.original_params = {}
+        for name, param in module.named_parameters():
+            if ignoreNames in name:
+                print(" ***************************************8 Found a discriminator")
+                print("***************************************************************")
+            module.original_params[name] = param.clone()
+
+        n_params = sum([
+            p.numel() for n, p in module.named_parameters() if not ignoreNames in n
+        ])
+        random_vector = torch.rand(n_params)
+        direction = (random_vector / torch.norm(random_vector)).cuda() 
+        offset = 0
+        for n, p in module.named_parameters():
+            if ignoreNames in n:
+                continue
+            size = p.numel()
+            ip = direction[offset:offset+size].view(p.shape)
+            p.data = module.original_params[n] + ip
+            offset += size
+        print("Finished perturbing.")
+    return module

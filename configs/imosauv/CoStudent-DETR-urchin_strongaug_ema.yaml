@@ -7,6 +7,8 @@ DATASETS:
   TEST: ("squidle_urchin_2011_test",)
   BATCH_CONTENTS: ("labeled_strong","labeled_weak",)
   BATCH_RATIOS: (1,1,)
+INPUT:
+  MAX_SIZE_TRAIN: 1333
 EMA:
   ENABLED: True
 DOMAIN_ADAPT:
@@ -22,11 +24,14 @@ DOMAIN_ADAPT:
 SAOD:
   LABELING_METHOD: "WeakTeacherWStrongStudentW" # or "CoStudent", "StudentTeacher"
 SOLVER:
-  STEPS: (6000, 8000,) #
-  MAX_ITER: 9001 # 3 X 3000
-  CHECKPOINT_PERIOD: 1000
-  IMS_PER_BATCH: 16
-  IMS_PER_GPU: 8
+  BASE_LR: 0.00005
+  STEPS: (24000, 32000,) #
+  MAX_ITER: 38001 # 3 X 3000
+  CHECKPOINT_PERIOD: 4000
+  IMS_PER_BATCH: 4
+  IMS_PER_GPU: 4
+TEST:
+  EVAL_PERIOD: 2000
 LOGGING:
   TAGS: "SAOD,DETR"
 OUTPUT_DIR: "outputs/imosauv/urchin_detr_saod/"

@@ -170,3 +170,4 @@ cython_debug/
 /.neptune/
 /groundtruths/
 /detections/
+/saga_outputs/

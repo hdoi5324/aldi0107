@@ -1,0 +1,6 @@
+_BASE_: "./ALDI-imosauv_final.yaml"
+MODEL:
+  WEIGHTS: "outputs/imosauv/imosauv_baseline_strongaug_ema_udd/UDD_test_model_best.pth"
+OUTPUT_DIR: "outputs/imosauv/imosauv_ALDI_max/"
+LOGGING:
+  TAGS: "RCCN-FPN,ALDI_max"

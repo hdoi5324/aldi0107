@@ -1,0 +1,26 @@
+_BASE_: "./Base-RCNN-FPN-imosauv_strongaug_ema.yaml"
+MODEL:
+  WEIGHTS: "outputs/imosauv/imosauv_baseline_strongaug_ema_udd/model_final.pth"  #imosauv_base_strongaug_ema
+EMA:
+  ENABLED: True
+DATASETS:
+  UNLABELED: ("UDD_train",)
+  BATCH_CONTENTS: ("labeled_weak", "labeled_strong", "unlabeled_strong")
+  BATCH_RATIOS: (1,1,1)
+DOMAIN_ADAPT:
+  TEACHER:
+    ENABLED: True
+  DISTILL:
+    # By default, disable localization losses (done by AT, UBT, MIC, ...)
+    HARD_ROIH_CLS_ENABLED: True
+    HARD_ROIH_REG_ENABLED: False
+    HARD_OBJ_ENABLED: True
+    HARD_RPN_REG_ENABLED: False
+SOLVER:
+  IMS_PER_BATCH: 24 # was 24 with BASE_LR 0.03
+  BASE_LR: 0.03 
+UMS:
+  UNLABELED: None
+OUTPUT_DIR: "outputs/imosauv/imosauv_meanteacher_udd/"
+LOGGING:
+  TAGS: "RCCN-FPN,MT_final"

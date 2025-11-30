@@ -1,12 +1,15 @@
 _BASE_: "./Base-RCNN-FPN-imosauv_strongaug_ema.yaml"
 MODEL:
-  WEIGHTS: "outputs/imosauv/imosauv_baseline_strongaug_ema/model_final.pth"
+  WEIGHTS: "outputs/imosauv/imosauv_baseline_strongaug_ema_udd/model_final.pth"
 EMA:
   ENABLED: True
 DATASETS:
   UNLABELED: ("UDD_train",)
   BATCH_CONTENTS: ("labeled_strong", "unlabeled_strong")
   BATCH_RATIOS: (1,1)
+SOLVER:
+  WARMUP_ITERS: 1000
+  WARMUP_FACTOR: 0.01
 DOMAIN_ADAPT:
   TEACHER:
     ENABLED: True
@@ -24,10 +27,8 @@ AUG:
   UNLABELED_INCLUDE_RANDOM_ERASING: False
   LABELED_MIC_AUG: False
   UNLABELED_MIC_AUG: True
-SOLVER:
-  STEPS: (29999,)
-  MAX_ITER: 30000 # 3X 15,000 - dropped to 40,000
-  CHECKPOINT_PERIOD: 3000
-OUTPUT_DIR: "outputs/imosauv/imosauv_ALDI_last/"
+UMS:
+  UNLABELED: None
+OUTPUT_DIR: "outputs/imosauv/imosauv_ALDI_final/"
 LOGGING:
-  TAGS: "RCCN-FPN,ALDI"
+  TAGS: "RCCN-FPN,ALDI_final"

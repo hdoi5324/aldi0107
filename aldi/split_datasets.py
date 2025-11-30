@@ -27,6 +27,23 @@ def split_train_data(cfg):
     return cfg
 
 
+def split_test_data(cfg):
+    new_ds = []
+    for name in cfg.DATASETS.TEST:
+        if '_split_' in name:
+            ds_name, num_split = name.split('_split_')
+            labelled, _ = split_dataset_labelled_unlabelled(
+                ds_name,
+                int(num_split),
+                filter_empty=cfg.DATALOADER.FILTER_EMPTY_ANNOTATIONS,
+                seed=cfg.SEED)
+            if labelled is not None:
+                new_ds.append(labelled)
+        else:
+            new_ds.append(name)
+    cfg.DATASETS.TEST = new_ds
+    return cfg
+
 def split_dataset_labelled_unlabelled(dataset_name, num_labelled, filter_empty=True, seed=0):
     # get metadata
     metadata = MetadataCatalog.get(dataset_name)
